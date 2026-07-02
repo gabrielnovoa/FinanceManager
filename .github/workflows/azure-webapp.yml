@@ -1,0 +1,49 @@
+name: Build and deploy to Azure Web App
+
+# Set AZURE_WEBAPP_NAME below and add the publish profile as the repository
+# secret AZURE_WEBAPP_PUBLISH_PROFILE (Azure Portal → your Web App → Get
+# publish profile). Then every push to main deploys automatically.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: your-finance-app   # <-- change to your Azure Web App name
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '20.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build React client
+        run: |
+          npm --prefix client install
+          npm --prefix client run build
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Bundle SPA into API and publish
+        run: |
+          rm -rf server/wwwroot && mkdir -p server/wwwroot
+          cp -r client/dist/* server/wwwroot/
+          dotnet publish server/FinanceManager.Api.csproj -c Release -o publish
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish

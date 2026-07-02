@@ -1,0 +1,20 @@
+# .NET
+bin/
+obj/
+publish/
+*.user
+server/wwwroot/
+*.db
+*.db-shm
+*.db-wal
+
+# Node / Vite
+node_modules/
+client/dist/
+client/.vite/
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
