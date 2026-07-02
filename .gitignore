@@ -12,6 +12,9 @@ server/wwwroot/
 node_modules/
 client/dist/
 client/.vite/
+client/*.tsbuildinfo
+client/vite.config.js
+client/vite.config.d.ts
 
 # Editors / OS
 .vs/
