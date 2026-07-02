@@ -19,7 +19,8 @@ public class DashboardController(AppDbContext db) : ControllerBase
         var income = await db.Incomes.ToListAsync();
         var debts = await db.Debts.ToListAsync();
         var netWorth = await db.NetWorthEntries.ToListAsync();
-        var fixedMonthly = db.FixedCosts.Any() ? await db.FixedCosts.SumAsync(f => f.MonthlyAmount) : 0m;
+        var fixedCosts = await db.FixedCosts.ToListAsync();
+        var fixedMonthly = fixedCosts.Sum(f => f.MonthlyAmount);
 
         var availableYears = expenses.Select(e => e.Date.Year)
             .Concat(income.Select(i => i.Date.Year))

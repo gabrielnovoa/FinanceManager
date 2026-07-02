@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using FinanceManager.Api.Data;
 using FinanceManager.Api.Dtos;
@@ -31,7 +33,8 @@ public class ImportController(AppDbContext db) : ControllerBase
         XLWorkbook wb;
         try
         {
-            wb = new XLWorkbook(stream);
+            using var sanitized = RemovePivotTables(stream);
+            wb = new XLWorkbook(sanitized);
         }
         catch (Exception ex)
         {
@@ -108,6 +111,71 @@ public class ImportController(AppDbContext db) : ControllerBase
     }
 
     // ---- helpers -------------------------------------------------------------
+
+    /// <summary>
+    /// Strips PivotTables/PivotCaches from the uploaded workbook before ClosedXML parses it.
+    /// ClosedXML has a known bug reading certain PivotCache records (throws
+    /// PartStructureException: "There is a problem with element structure in XML") even when
+    /// the underlying data sheets are perfectly valid. This app never reads pivot tables, so
+    /// removing them first is safe and makes import work for any workbook that has them.
+    /// </summary>
+    private static MemoryStream RemovePivotTables(Stream input)
+    {
+        var output = new MemoryStream();
+        input.Position = 0;
+        input.CopyTo(output);
+        output.Position = 0;
+
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Update, leaveOpen: true))
+        {
+            foreach (var entry in archive.Entries
+                .Where(e => e.FullName.StartsWith("xl/pivotCache/", StringComparison.OrdinalIgnoreCase)
+                         || e.FullName.StartsWith("xl/pivotTables/", StringComparison.OrdinalIgnoreCase))
+                .ToList())
+            {
+                entry.Delete();
+            }
+
+            RewriteZipEntry(archive, "[Content_Types].xml", xml =>
+                Regex.Replace(xml, "<Override[^>]*?PartName=\"/xl/(pivotCache|pivotTables)/[^\"]*\"[^>]*?/>", ""));
+
+            RewriteZipEntry(archive, "xl/workbook.xml", xml =>
+                Regex.Replace(xml, "<pivotCaches>.*?</pivotCaches>", "", RegexOptions.Singleline));
+
+            RewriteZipEntry(archive, "xl/_rels/workbook.xml.rels", xml =>
+                Regex.Replace(xml, "<Relationship\\b[^>]*?pivotCacheDefinition[^>]*?/>", ""));
+
+            foreach (var relEntryName in archive.Entries
+                .Where(e => e.FullName.StartsWith("xl/worksheets/_rels/", StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.FullName)
+                .ToList())
+            {
+                RewriteZipEntry(archive, relEntryName, xml =>
+                    Regex.Replace(xml, "<Relationship\\b[^>]*?/pivotTable\"[^>]*?/>", ""));
+            }
+        }
+
+        output.Position = 0;
+        return output;
+    }
+
+    private static void RewriteZipEntry(ZipArchive archive, string entryName, Func<string, string> transform)
+    {
+        var entry = archive.GetEntry(entryName);
+        if (entry is null) return;
+
+        string original;
+        using (var reader = new StreamReader(entry.Open()))
+            original = reader.ReadToEnd();
+
+        var updated = transform(original);
+        if (updated == original) return;
+
+        entry.Delete();
+        var replacement = archive.CreateEntry(entryName);
+        using var writer = new StreamWriter(replacement.Open());
+        writer.Write(updated);
+    }
 
     private async Task<int> Replace<T>(DbSet<T> set, List<T> rows) where T : BaseEntity
     {
