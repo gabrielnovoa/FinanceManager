@@ -30,6 +30,23 @@ export const en = {
   'common.confirmDelete': 'Delete this entry? This cannot be undone.',
   'common.noEntries': 'No entries yet — add one above, or use Import.',
 
+  // ---- Table: sorting / filtering / grouping ----
+  'table.groupByMonth': 'Group by month',
+  'table.expandAll': 'Expand all',
+  'table.collapseAll': 'Collapse all',
+  'table.clearFilters': 'Clear filters',
+  'table.filterPlaceholder': 'Filter…',
+  'table.filterNumPlaceholder': '> 100',
+  'table.filterDatePlaceholder': '2025-03',
+  'table.filterAria': 'Filter by {column}',
+  'table.sortAria': 'Sort by {column}',
+  'table.noDate': 'Undated',
+  'table.noMatches': 'No entries match your filters.',
+  'table.showingOf': '{shown} of {total} shown',
+  'table.subtotal': 'Subtotal',
+  'table.expandGroup': 'Expand {group}',
+  'table.collapseGroup': 'Collapse {group}',
+
   // ---- Dashboard ----
   'dashboard.title': 'Dashboard',
   'dashboard.subtitle': 'Income, spending, net worth and debt at a glance.',
@@ -146,6 +163,23 @@ export const pt: Record<TranslationKey, string> = {
   'common.entryCountPlural': '{count} registos',
   'common.confirmDelete': 'Eliminar este registo? Esta ação não pode ser anulada.',
   'common.noEntries': 'Ainda não há registos — adicione um acima ou use a importação.',
+
+  // ---- Tabela: ordenação / filtros / agrupamento ----
+  'table.groupByMonth': 'Agrupar por mês',
+  'table.expandAll': 'Expandir tudo',
+  'table.collapseAll': 'Recolher tudo',
+  'table.clearFilters': 'Limpar filtros',
+  'table.filterPlaceholder': 'Filtrar…',
+  'table.filterNumPlaceholder': '> 100',
+  'table.filterDatePlaceholder': '2025-03',
+  'table.filterAria': 'Filtrar por {column}',
+  'table.sortAria': 'Ordenar por {column}',
+  'table.noDate': 'Sem data',
+  'table.noMatches': 'Nenhum registo corresponde aos filtros.',
+  'table.showingOf': '{shown} de {total} visíveis',
+  'table.subtotal': 'Subtotal',
+  'table.expandGroup': 'Expandir {group}',
+  'table.collapseGroup': 'Recolher {group}',
 
   // ---- Painel ----
   'dashboard.title': 'Painel',

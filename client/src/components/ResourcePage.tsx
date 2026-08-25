@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
-import type { Formatters } from '../format'
 import { useI18n } from '../i18n'
 import type { Field, Resource } from '../resources'
-
-type Row = Record<string, unknown> & { id: number }
+import DataTable, { isNumeric, type Row } from './DataTable'
 
 export default function ResourcePage({ resource }: { resource: Resource }) {
-  const { t, fmt } = useI18n()
+  const { t } = useI18n()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,15 +56,6 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
     }
   }
 
-  const total = useMemo(() => {
-    if (!resource.totalField) return null
-    return rows.reduce((s, r) => s + Number(r[resource.totalField!] ?? 0), 0)
-  }, [rows, resource.totalField])
-
-  const countLabel = loading
-    ? t('common.loading')
-    : t(rows.length === 1 ? 'common.entryCount' : 'common.entryCountPlural', { count: rows.length })
-
   return (
     <div>
       <h1 className="page-title">{resource.icon} {t(resource.titleKey)}</h1>
@@ -97,62 +86,23 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
         </div>
       </form>
 
-      {/* Table */}
-      <div className="toolbar">
-        <span className="count">{countLabel}</span>
-        <div className="spacer" />
-        <button className="btn" onClick={load} disabled={loading}>{t('common.refresh')}</button>
-      </div>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              {resource.fields.map((f) => (
-                <th key={f.key} className={isNumeric(f.type) ? 'num' : ''}>{t(f.labelKey)}</th>
-              ))}
-              <th className="row-actions">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                {resource.fields.map((f) => (
-                  <td key={f.key} className={isNumeric(f.type) ? 'num' : ''}>{cell(r[f.key], f, fmt)}</td>
-                ))}
-                <td className="row-actions">
-                  <button className="link-btn" onClick={() => remove(r.id)}>{t('common.delete')}</button>
-                </td>
-              </tr>
-            ))}
-            {!loading && rows.length === 0 && (
-              <tr><td colSpan={resource.fields.length + 1} className="empty">{t('common.noEntries')}</td></tr>
-            )}
-          </tbody>
-          {total !== null && rows.length > 0 && (
-            <tfoot>
-              <tr>
-                <td colSpan={resource.fields.length + 1} className="num" style={{ fontWeight: 700 }}>
-                  {t('common.total')}: {fmt.eur(total)}
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
+      {/* Sorting, filtering and grouping state is per-resource, so remount on switch. */}
+      <DataTable
+        key={resource.key}
+        fields={resource.fields}
+        rows={rows}
+        loading={loading}
+        totalField={resource.totalField}
+        groupBy={resource.groupBy}
+        onRefresh={load}
+        onDelete={remove}
+      />
     </div>
   )
 }
 
 // ---- helpers ----
-function isNumeric(t: Field['type']) { return t === 'money' || t === 'number' || t === 'int' }
 function inputType(t: Field['type']) { return t === 'date' ? 'date' : isNumeric(t) ? 'number' : 'text' }
-
-function cell(value: unknown, f: Field, fmt: Formatters) {
-  if (value === null || value === undefined || value === '') return f.type === 'money' ? fmt.eur(0) : '—'
-  if (f.type === 'money') return fmt.eur(Number(value))
-  return String(value)
-}
 
 function coerce(form: Record<string, unknown>, fields: Field[]) {
   const out: Record<string, unknown> = {}

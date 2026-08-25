@@ -22,6 +22,8 @@ export interface Resource {
   fields: Field[]
   /** Column whose sum is shown in the table footer. */
   totalField?: string
+  /** Date column to group rows by month/year. Omit to disable grouping. */
+  groupBy?: string
   defaults: () => Record<string, unknown>
 }
 
@@ -35,6 +37,7 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.expenses.subtitle',
     icon: '💸',
     totalField: 'amount',
+    groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
@@ -51,6 +54,7 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.income.subtitle',
     icon: '💰',
     totalField: 'amount',
+    groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
@@ -83,6 +87,7 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.debts.subtitle',
     icon: '🏦',
     totalField: 'outstanding',
+    groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
@@ -100,6 +105,7 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.networth.subtitle',
     icon: '📈',
     totalField: 'value',
+    groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
       { key: 'liquidity', labelKey: 'field.liquidity', type: 'text' },
@@ -116,6 +122,7 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.investments.subtitle',
     icon: '🪙',
     totalField: 'amount',
+    groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
       { key: 'origin', labelKey: 'field.origin', type: 'text', required: true },
