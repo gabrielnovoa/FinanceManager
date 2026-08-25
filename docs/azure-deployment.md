@@ -261,6 +261,38 @@ az rest --method POST --uri https://graph.microsoft.com/v1.0/invitations \
   }'
 ```
 
+### From the portal instead
+
+**Microsoft Entra ID → Users → All users → New user → Invite external user.**
+Fill in the email, set the redirect URL to <https://finance-tn.azurewebsites.net>,
+and invite.
+
+To resend to an existing guest: **Entra ID → Users → All users**, filter
+**User type = Guest**, click the user, then **Resend invitation** on the Overview
+blade.
+
+### If the invitation email never arrives
+
+This is common with `@outlook.com` — the message tends to land in Junk, or gets
+dropped silently. It does not matter much, because **the email is not required**.
+
+Check whether the account was actually created:
+
+```powershell
+az rest --method GET --uri "https://graph.microsoft.com/v1.0/users?`$filter=userType eq 'Guest'&`$select=displayName,mail,externalUserState" -o json
+```
+
+If the user is listed with `externalUserState: PendingAcceptance`, the invitation
+worked and the account exists. `PendingAcceptance` only means she has not
+redeemed yet — and redemption happens automatically the first time she signs in
+to the app. So once she is assigned to `finance-tn-auth` (below), she can simply
+open <https://finance-tn.azurewebsites.net>, sign in with her Microsoft account,
+accept the one-time consent prompt, and she is in.
+
+If you would rather send her a link directly, re-issue the invitation and read
+`inviteRedeemUrl` from the response — that URL redeems the invite without any
+email involved.
+
 **Turn on authentication** — portal → `finance-tn` → Settings → **Authentication**
 → Add identity provider:
 
