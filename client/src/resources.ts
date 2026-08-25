@@ -1,11 +1,14 @@
 // Declarative definition of every data table. Each page is just one of these
 // configs handed to <ResourcePage>, so adding a new table is a few lines here.
+// Labels are translation keys rather than literal text — see src/i18n.
+
+import type { TranslationKey } from './i18n/translations'
 
 export type FieldType = 'text' | 'money' | 'number' | 'int' | 'date'
 
 export interface Field {
   key: string
-  label: string
+  labelKey: TranslationKey
   type: FieldType
   required?: boolean
 }
@@ -13,8 +16,8 @@ export interface Field {
 export interface Resource {
   key: string        // URL segment, e.g. "expenses"
   endpoint: string   // API path, e.g. "expenses"
-  title: string
-  subtitle: string
+  titleKey: TranslationKey
+  subtitleKey: TranslationKey
   icon: string
   fields: Field[]
   /** Column whose sum is shown in the table footer. */
@@ -28,109 +31,109 @@ export const resources: Record<string, Resource> = {
   expenses: {
     key: 'expenses',
     endpoint: 'expenses',
-    title: 'Expenses',
-    subtitle: 'Every outgoing transaction — add or remove entries.',
+    titleKey: 'res.expenses.title',
+    subtitleKey: 'res.expenses.subtitle',
     icon: '💸',
     totalField: 'amount',
     fields: [
-      { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'item', label: 'Item', type: 'text', required: true },
-      { key: 'amount', label: 'Amount', type: 'money', required: true },
-      { key: 'category', label: 'Category', type: 'text', required: true },
-      { key: 'source', label: 'Source', type: 'text' },
+      { key: 'date', labelKey: 'field.date', type: 'date', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
+      { key: 'source', labelKey: 'field.source', type: 'text' },
     ],
     defaults: () => ({ date: today(), item: '', amount: 0, category: '', source: '' }),
   },
   income: {
     key: 'income',
     endpoint: 'income',
-    title: 'Income',
-    subtitle: 'Salary, refunds, cashback and other money in.',
+    titleKey: 'res.income.title',
+    subtitleKey: 'res.income.subtitle',
     icon: '💰',
     totalField: 'amount',
     fields: [
-      { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'item', label: 'Item', type: 'text', required: true },
-      { key: 'amount', label: 'Amount', type: 'money', required: true },
-      { key: 'category', label: 'Category', type: 'text', required: true },
-      { key: 'source', label: 'Source', type: 'text' },
+      { key: 'date', labelKey: 'field.date', type: 'date', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
+      { key: 'source', labelKey: 'field.source', type: 'text' },
     ],
     defaults: () => ({ date: today(), item: '', amount: 0, category: '', source: '' }),
   },
   fixedcosts: {
     key: 'fixedcosts',
     endpoint: 'fixedcosts',
-    title: 'Fixed Costs',
-    subtitle: 'Recurring monthly commitments and their yearly weight.',
+    titleKey: 'res.fixedcosts.title',
+    subtitleKey: 'res.fixedcosts.subtitle',
     icon: '📌',
     totalField: 'monthlyAmount',
     fields: [
-      { key: 'type', label: 'Type', type: 'text' },
-      { key: 'category', label: 'Category', type: 'text', required: true },
-      { key: 'item', label: 'Item', type: 'text', required: true },
-      { key: 'monthlyAmount', label: 'Monthly', type: 'money', required: true },
-      { key: 'annualAmount', label: 'Annual', type: 'money' },
+      { key: 'type', labelKey: 'field.type', type: 'text' },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'monthlyAmount', labelKey: 'field.monthlyAmount', type: 'money', required: true },
+      { key: 'annualAmount', labelKey: 'field.annualAmount', type: 'money' },
     ],
     defaults: () => ({ type: 'Conta Fixa', category: '', item: '', monthlyAmount: 0, annualAmount: 0 }),
   },
   debts: {
     key: 'debts',
     endpoint: 'debts',
-    title: 'Debts',
-    subtitle: 'Monthly snapshots of what you owe.',
+    titleKey: 'res.debts.title',
+    subtitleKey: 'res.debts.subtitle',
     icon: '🏦',
     totalField: 'outstanding',
     fields: [
-      { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'item', label: 'Item', type: 'text', required: true },
-      { key: 'installment', label: 'Installment', type: 'money' },
-      { key: 'outstanding', label: 'Outstanding', type: 'money', required: true },
-      { key: 'termMonths', label: 'Term (months)', type: 'int' },
-      { key: 'interest', label: 'Interest', type: 'money' },
+      { key: 'date', labelKey: 'field.date', type: 'date', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'installment', labelKey: 'field.installment', type: 'money' },
+      { key: 'outstanding', labelKey: 'field.outstanding', type: 'money', required: true },
+      { key: 'termMonths', labelKey: 'field.termMonths', type: 'int' },
+      { key: 'interest', labelKey: 'field.interest', type: 'money' },
     ],
     defaults: () => ({ date: today(), item: '', installment: 0, outstanding: 0, termMonths: 0, interest: 0 }),
   },
   networth: {
     key: 'networth',
     endpoint: 'networth',
-    title: 'Net Worth',
-    subtitle: 'Asset snapshots by class and liquidity.',
+    titleKey: 'res.networth.title',
+    subtitleKey: 'res.networth.subtitle',
     icon: '📈',
     totalField: 'value',
     fields: [
-      { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'liquidity', label: 'Liquidity', type: 'text' },
-      { key: 'assetClass', label: 'Asset Class', type: 'text', required: true },
-      { key: 'item', label: 'Item', type: 'text', required: true },
-      { key: 'value', label: 'Value', type: 'money', required: true },
+      { key: 'date', labelKey: 'field.date', type: 'date', required: true },
+      { key: 'liquidity', labelKey: 'field.liquidity', type: 'text' },
+      { key: 'assetClass', labelKey: 'field.assetClass', type: 'text', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'value', labelKey: 'field.value', type: 'money', required: true },
     ],
     defaults: () => ({ date: today(), liquidity: 'Alta', assetClass: '', item: '', value: 0 }),
   },
   investments: {
     key: 'investments',
     endpoint: 'investments',
-    title: 'Investments',
-    subtitle: 'Contributions and transfers into your holdings.',
+    titleKey: 'res.investments.title',
+    subtitleKey: 'res.investments.subtitle',
     icon: '🪙',
     totalField: 'amount',
     fields: [
-      { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'origin', label: 'Origin', type: 'text', required: true },
-      { key: 'destination', label: 'Destination', type: 'text', required: true },
-      { key: 'amount', label: 'Amount', type: 'money', required: true },
+      { key: 'date', labelKey: 'field.date', type: 'date', required: true },
+      { key: 'origin', labelKey: 'field.origin', type: 'text', required: true },
+      { key: 'destination', labelKey: 'field.destination', type: 'text', required: true },
+      { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
     ],
     defaults: () => ({ date: today(), origin: '', destination: '', amount: 0 }),
   },
   accounts: {
     key: 'accounts',
     endpoint: 'accounts',
-    title: 'Bank Accounts',
-    subtitle: 'Reference list of your accounts.',
+    titleKey: 'res.accounts.title',
+    subtitleKey: 'res.accounts.subtitle',
     icon: '💳',
     fields: [
-      { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'iban', label: 'IBAN', type: 'text' },
-      { key: 'swift', label: 'SWIFT', type: 'text' },
+      { key: 'name', labelKey: 'field.name', type: 'text', required: true },
+      { key: 'iban', labelKey: 'field.iban', type: 'text' },
+      { key: 'swift', labelKey: 'field.swift', type: 'text' },
     ],
     defaults: () => ({ name: '', iban: '', swift: '' }),
   },

@@ -1,19 +1,44 @@
-const eurFmt = new Intl.NumberFormat('pt-PT', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 2,
-})
+// Formatting is locale-aware: the *currency* is always EUR (that's what the data
+// is in), but grouping, decimal separators and month names follow the language
+// the user picked. Built once per locale by the i18n provider.
 
-const numFmt = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 0 })
+export interface Formatters {
+  /** "1.234,56 €" (pt-PT) / "€1,234.56" (en-GB) */
+  eur: (n: number | null | undefined) => string
+  /** Whole euros, no decimals. */
+  eur0: (n: number | null | undefined) => string
+  pct: (n: number | null | undefined) => string
+  /** Short axis labels, e.g. "12 mil" / "12K". */
+  compact: (n: number) => string
+  /** "2025-01" -> "Jan 2025" / "jan. 2025" */
+  monthLabel: (key: string) => string
+}
 
-export const eur = (n: number | null | undefined) => eurFmt.format(Number(n ?? 0))
-export const eur0 = (n: number | null | undefined) => numFmt.format(Number(n ?? 0)) + ' €'
-export const pct = (n: number | null | undefined) => `${Number(n ?? 0).toFixed(1)}%`
+export function createFormatters(locale: string): Formatters {
+  const eurFmt = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  })
+  const numFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
+  const compactFmt = new Intl.NumberFormat(locale, { notation: 'compact' })
+  const pctFmt = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })
+  // Only the month part: pt-PT's combined short month+year pattern is numeric
+  // ("01/2025"), which reads far worse on a chart axis than "jan. 2025".
+  const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
 
-// "2025-01" -> "Jan 2025"
-export function monthLabel(key: string): string {
-  const [y, m] = key.split('-').map(Number)
-  if (!y || !m) return key
-  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${names[m - 1]} ${y}`
+  return {
+    eur: (n) => eurFmt.format(Number(n ?? 0)),
+    eur0: (n) => numFmt.format(Number(n ?? 0)) + ' €',
+    pct: (n) => `${pctFmt.format(Number(n ?? 0))}%`,
+    compact: (n) => compactFmt.format(n),
+    monthLabel: (key) => {
+      const [y, m] = key.split('-').map(Number)
+      if (!y || !m) return key
+      return `${monthFmt.format(new Date(Date.UTC(y, m - 1, 1)))} ${y}`
+    },
+  }
 }

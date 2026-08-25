@@ -64,6 +64,30 @@ a { color: inherit; text-decoration: none; }
 .nav-link .ico { width: 18px; text-align: center; }
 .sidebar .foot { margin-top: auto; font-size: 11px; color: #64748b; padding: 10px; }
 
+/* ---- Language picker ---- */
+.lang-picker { margin-top: auto; padding: 10px 12px 4px; }
+.lang-picker label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+.lang-picker select {
+  width: 100%;
+  background: var(--bg-soft);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lang-picker select:hover { border-color: var(--brand); }
+.lang-picker select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.lang-picker option { background: var(--bg); color: #e2e8f0; }
+
 .main { flex: 1; padding: 28px 32px; max-width: 1240px; }
 .page-title { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
 .page-sub { color: var(--text-soft); margin: 0 0 22px; font-size: 14px; }
