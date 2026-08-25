@@ -425,6 +425,62 @@ never races the first.
 The app has no EF migrations, so changing a model means dropping and recreating
 `financedb` — export your data first.
 
+## Verify the whole setup
+
+Every command here is read-only. Run them when something misbehaves, or after
+any change, to confirm the pieces are still wired together. Several of these
+steps can fail *silently* — step 3 in particular looks successful even when the
+federated credentials were never created.
+
+```powershell
+# Resources exist and the app is running
+az webapp show -g rg-finance-tn -n finance-tn --query "{state:state,os:kind}" -o json
+az sql db show -g rg-finance-tn -s sql-finance-tn -n financedb --query "{status:status,tier:sku.tier}" -o json
+
+# App settings point at Azure SQL over managed identity
+az webapp config appsettings list -g rg-finance-tn -n finance-tn --query "[?name=='DatabaseProvider']" -o json
+
+# The web app has a system-assigned identity
+az webapp identity show -g rg-finance-tn -n finance-tn --query principalId -o tsv
+
+# Easy Auth is on and closed to everyone but assigned users
+az rest --method GET --url "https://management.azure.com/subscriptions/$sub/resourceGroups/rg-finance-tn/providers/Microsoft.Web/sites/finance-tn/config/authsettingsV2?api-version=2022-03-01" --query "properties.globalValidation" -o json
+az ad sp show --id finance-tn-auth --query appRoleAssignmentRequired -o tsv   # must be true
+
+# Exactly the intended people are assigned
+az rest --method GET --url "https://graph.microsoft.com/v1.0/servicePrincipals/<AUTH_SP_OBJECT_ID>/appRoleAssignedTo" --query "value[].principalDisplayName" -o tsv
+```
+
+### Confirming the database grant
+
+The `db_owner` grant from step 2 lives *inside* `financedb`, so no ARM command
+can see it. To check it you have to connect. The server firewall only allows
+Azure services, so open a temporary hole for your own address and close it
+again afterwards:
+
+```powershell
+$ip = (Invoke-RestMethod 'https://api.ipify.org?format=json').ip
+az sql server firewall-rule create -g rg-finance-tn -s sql-finance-tn -n TempLocalAudit --start-ip-address $ip --end-ip-address $ip -o none
+
+$tok = az account get-access-token --resource https://database.windows.net/ --query accessToken -o tsv
+Invoke-Sqlcmd -ServerInstance "sql-finance-tn.database.windows.net" -Database financedb -AccessToken $tok -Query @"
+SELECT p.name, p.type_desc, r.name AS role_name
+FROM sys.database_principals p
+JOIN sys.database_role_members rm ON rm.member_principal_id = p.principal_id
+JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id
+WHERE p.type = 'E';
+"@
+
+az sql server firewall-rule delete -g rg-finance-tn -s sql-finance-tn -n TempLocalAudit -o none
+```
+
+Expect one row: `finance-tn` / `EXTERNAL_USER` / `db_owner`. An access token is
+used rather than `-G` because the tenant requires MFA, which `sqlcmd` cannot
+complete non-interactively.
+
+Before the first deploy `sys.tables` is empty — `EnsureCreated()` has not run
+yet. That is normal, not a broken grant.
+
 ## Troubleshooting
 
 | Symptom | Cause |
