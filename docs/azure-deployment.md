@@ -149,6 +149,10 @@ az role assignment create \
 Now trust GitHub's token. The workflow declares `environment: production`, so the
 subject claim is the `environment:` form, **not** `ref:refs/heads/main`:
 
+> **Run these two commands in Bash, not PowerShell.** The inline `'{ ... }'` JSON
+> is Bash quoting; PowerShell mangles it before `az` sees it and the command
+> fails. If you are on Windows, use the PowerShell version further below instead.
+
 ```bash
 az ad app federated-credential create --id $APP_ID --parameters '{
   "name": "github-production",
@@ -171,6 +175,58 @@ az ad app federated-credential create --id $APP_ID --parameters '{
   "audiences": ["api://AzureADTokenExchange"]
 }'
 ```
+
+### PowerShell equivalent
+
+On Windows, write the JSON to a file and pass it with `@`, which avoids the
+quoting problem entirely:
+
+```powershell
+$APPID = "<the appId from az ad app create>"
+$tmp = Join-Path $env:TEMP "fedcred"
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+@{
+  name      = "github-production"
+  issuer    = "https://token.actions.githubusercontent.com"
+  subject   = "repo:gabrielnovoa/FinanceManager:environment:production"
+  audiences = @("api://AzureADTokenExchange")
+} | ConvertTo-Json | Set-Content -Encoding utf8 "$tmp\fc1.json"
+
+@{
+  name      = "github-production-immutable"
+  issuer    = "https://token.actions.githubusercontent.com"
+  subject   = "repo:gabrielnovoa@17750196/FinanceManager@1287392859:environment:production"
+  audiences = @("api://AzureADTokenExchange")
+} | ConvertTo-Json | Set-Content -Encoding utf8 "$tmp\fc2.json"
+
+az ad app federated-credential create --id $APPID --parameters "@$tmp\fc1.json"
+az ad app federated-credential create --id $APPID --parameters "@$tmp\fc2.json"
+```
+
+### Verify step 3
+
+All three of these must succeed before the workflow can deploy:
+
+```powershell
+$APPID = "<appId>"
+$SUB   = "<SUBSCRIPTION_ID>"
+
+# a. the service principal exists - note its objectId
+az ad sp show --id $APPID --query "{objectId:id,type:servicePrincipalType}" -o json
+
+# b. Website Contributor is assigned to that objectId on the resource group
+az role assignment list --scope "/subscriptions/$SUB/resourceGroups/rg-finance-tn" `
+  --query "[].{role:roleDefinitionName,principalId:principalId,type:principalType}" -o table
+
+# c. two federated credentials exist
+az ad app federated-credential list --id $APPID --query "[].{name:name,subject:subject}" -o table
+```
+
+Expected: a `Website Contributor` row whose `principalId` equals the objectId
+from (a), and two credentials in (c). An empty `[]` from (c) is the usual
+symptom of the Bash-quoting failure described above — the role assignment can be
+perfectly fine while the credentials silently never got created.
 
 ## 4. Add the repository variables
 
