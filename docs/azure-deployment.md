@@ -318,8 +318,70 @@ az rest --method PATCH \
 ```
 
 Then portal → Entra ID → Enterprise applications → `finance-tn-auth` →
-**Users and groups** → add `owner@example.com` and
-`seconduser@example.com`. Both get identical full access; the app has no roles.
+**Users and groups** → add both accounts below. Both get identical full access;
+the app has no roles.
+
+### Which accounts to assign
+
+The tenant contains three principals, and two of them look like "Gabriel".
+Assign the first and the third — **not** the GABN Corp guest:
+
+| Assign? | Display name | Sign-in (UPN) | Mail | Object ID |
+| --- | --- | --- | --- | --- |
+| ✅ yes | Gabriel Nóvoa | `owner@contoso.onmicrosoft.com` | `owner@example.com` | `<OWNER_OBJECT_ID>` |
+| ❌ no | Gabriel Nóvoa (GABN Corp) | `owner_work-tenant.onmicrosoft.com#EXT#@…` | `owner@work-tenant.onmicrosoft.com` | `<WORK_GUEST_OBJECT_ID>` |
+| ✅ yes | seconduser | `seconduser_example.com#EXT#@…` | `seconduser@example.com` | `<SECOND_USER_OBJECT_ID>` |
+
+Note that Gabriel's **UPN is not his email address**. Searching the portal picker
+for `owner@example.com` will probably return nothing, because the picker
+matches on UPN and display name. Search for `Gabriel Nóvoa` and choose the
+**Member** entry, or paste the object ID.
+
+The same distinction matters at sign-in: if `owner@example.com` is not
+accepted at the app's login prompt, use
+`owner@contoso.onmicrosoft.com` instead.
+
+### Assigning from the command line
+
+Once the identity provider exists, this assigns both users without the portal
+picker (PowerShell, quote-safe):
+
+```powershell
+$AUTH_SP = az ad sp list --display-name "finance-tn-auth" --query "[0].id" -o tsv
+$tmp = Join-Path $env:TEMP "assign"
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+# appRoleId all-zeros means "default access" - the app defines no roles
+$users = @(
+  @{ name = "owner"; oid = "<OWNER_OBJECT_ID>" },
+  @{ name = "seconduser";   oid = "<SECOND_USER_OBJECT_ID>" }
+)
+
+foreach ($u in $users) {
+  @{
+    principalId = $u.oid
+    resourceId  = $AUTH_SP
+    appRoleId   = "00000000-0000-0000-0000-000000000000"
+  } | ConvertTo-Json | Set-Content -Encoding utf8 "$tmp\$($u.name).json"
+
+  az rest --method POST `
+    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$AUTH_SP/appRoleAssignedTo" `
+    --headers "Content-Type=application/json" `
+    --body "@$tmp\$($u.name).json"
+}
+
+Remove-Item $tmp -Recurse -Force
+```
+
+Verify afterwards:
+
+```powershell
+az rest --method GET `
+  --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$AUTH_SP/appRoleAssignedTo" `
+  --query "value[].principalDisplayName" -o table
+```
+
+Exactly two names should be listed.
 
 Anyone not on that list is refused at the platform edge and never reaches the app.
 
