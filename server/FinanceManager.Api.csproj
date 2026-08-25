@@ -5,7 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>FinanceManager.Api</RootNamespace>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!--
+      Must stay false: Microsoft.Data.SqlClient resolves the en-US culture when
+      opening a connection, which throws CultureNotFoundException under
+      globalization-invariant mode. Only bites on Linux (Azure App Service),
+      because the local SQLite provider never asks for a culture.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
