@@ -485,6 +485,7 @@ yet. That is normal, not a broken grant.
 
 | Symptom | Cause |
 | --- | --- |
+| Site returns 503 and the container exits with code 134 | `CultureNotFoundException` at startup. `Microsoft.Data.SqlClient` resolves `en-US` when opening a connection, which fails if `InvariantGlobalization` is `true` in the `.csproj`. It must stay `false`. Never reproduces locally, because SQLite does not request a culture. |
 | `AADSTS50076` on `az login` | Tenant requires MFA. Use `az login --tenant <TENANT_ID>`. |
 | `AADSTS70021: No matching federated identity record found` | Subject mismatch. It must be the `environment:production` form, not `ref:refs/heads/main`. |
 | Login step fails with an empty client id | The three identifiers were added as Secrets instead of Variables. |
