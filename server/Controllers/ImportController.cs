@@ -13,7 +13,7 @@ namespace FinanceManager.Api.Controllers;
 
 [ApiController]
 [Route("api")]
-public class ImportController(AppDbContext db) : ControllerBase
+public class ImportController(AppDbContext db, IWebHostEnvironment env) : ControllerBase
 {
     /// <summary>
     /// Import an unlocked Finance.xlsx. Each recognised sheet replaces the matching
@@ -22,7 +22,7 @@ public class ImportController(AppDbContext db) : ControllerBase
     /// </summary>
     [HttpPost("import/excel")]
     [RequestSizeLimit(50_000_000)]
-    public async Task<ActionResult<ImportResultDto>> ImportExcel(IFormFile file)
+    public async Task<ActionResult<ImportResultDto>> ImportExcel(IFormFile file, [FromQuery] bool confirm = false)
     {
         if (file is null || file.Length == 0) return BadRequest("No file uploaded.");
 
@@ -41,43 +41,55 @@ public class ImportController(AppDbContext db) : ControllerBase
             return BadRequest($"Could not open the workbook. If it is password-protected, remove the password in Excel and try again. ({ex.Message})");
         }
 
-        var inserted = new Dictionary<string, int>();
-
+        // Work out which tables this workbook would replace *before* touching the
+        // database, so the overwrite guard can report what is at stake and nothing
+        // is deleted when the import turns out to be unusable.
+        var jobs = new List<(string Key, Func<Task<int>> Run)>();
         if (FindSheet(wb, "Despesas") is { } despesas)
-            inserted["expenses"] = await Replace(db.Expenses, ReadTransactions(despesas, isExpense: true).Cast<Expense>().ToList());
+            jobs.Add(("expenses", () => Replace(db.Expenses, ReadTransactions(despesas, isExpense: true).Cast<Expense>().ToList())));
         if (FindSheet(wb, "Receitas") is { } receitas)
-            inserted["income"] = await Replace(db.Incomes, ReadTransactions(receitas, isExpense: false).Cast<Income>().ToList());
+            jobs.Add(("income", () => Replace(db.Incomes, ReadTransactions(receitas, isExpense: false).Cast<Income>().ToList())));
         if (FindSheet(wb, "Gastos Fixos", "GastosFixos") is { } gastos)
-            inserted["fixedCosts"] = await Replace(db.FixedCosts, ReadFixedCosts(gastos));
+            jobs.Add(("fixedCosts", () => Replace(db.FixedCosts, ReadFixedCosts(gastos))));
         if (FindSheet(wb, "Dividas", "Dívidas") is { } dividas)
-            inserted["debts"] = await Replace(db.Debts, ReadDebts(dividas));
+            jobs.Add(("debts", () => Replace(db.Debts, ReadDebts(dividas))));
         if (FindSheet(wb, "Patrimonio", "Patrimônio") is { } patrimonio)
-            inserted["netWorth"] = await Replace(db.NetWorthEntries, ReadNetWorth(patrimonio));
+            jobs.Add(("netWorth", () => Replace(db.NetWorthEntries, ReadNetWorth(patrimonio))));
         if (FindSheet(wb, "Investimentos") is { } investimentos)
-            inserted["investments"] = await Replace(db.Investments, ReadInvestments(investimentos));
+            jobs.Add(("investments", () => Replace(db.Investments, ReadInvestments(investimentos))));
         if (FindSheet(wb, "Contas Bancarias", "Contas Bancárias") is { } contas)
-            inserted["accounts"] = await Replace(db.Accounts, ReadAccounts(contas));
+            jobs.Add(("accounts", () => Replace(db.Accounts, ReadAccounts(contas))));
+
+        if (jobs.Count == 0)
+            return BadRequest("No recognised sheets found. Expected sheets like Despesas, Receitas, Gastos Fixos, Dívidas, Patrimônio, Investimentos, Contas Bancárias.");
+
+        if (await GuardOverwrite(confirm, jobs.Select(j => j.Key)) is { } blocked) return blocked;
+
+        var inserted = new Dictionary<string, int>();
+        foreach (var (key, run) in jobs) inserted[key] = await run();
 
         await db.SaveChangesAsync();
-
-        if (inserted.Count == 0)
-            return BadRequest("No recognised sheets found. Expected sheets like Despesas, Receitas, Gastos Fixos, Dívidas, Patrimônio, Investimentos, Contas Bancárias.");
 
         return new ImportResultDto("Import complete.", inserted);
     }
 
     /// <summary>Import a JSON backup produced by /api/export/json. Replaces all data.</summary>
     [HttpPost("import/json")]
-    public async Task<ActionResult<ImportResultDto>> ImportJson([FromBody] BackupModel backup)
+    public async Task<ActionResult<ImportResultDto>> ImportJson([FromBody] BackupModel backup, [FromQuery] bool confirm = false)
     {
+        var jobs = new List<(string Key, Func<Task<int>> Run)>();
+        if (backup.Expenses is { } expenses) jobs.Add(("expenses", () => Replace(db.Expenses, expenses)));
+        if (backup.Income is { } income) jobs.Add(("income", () => Replace(db.Incomes, income)));
+        if (backup.FixedCosts is { } fixedCosts) jobs.Add(("fixedCosts", () => Replace(db.FixedCosts, fixedCosts)));
+        if (backup.Debts is { } debts) jobs.Add(("debts", () => Replace(db.Debts, debts)));
+        if (backup.NetWorth is { } netWorth) jobs.Add(("netWorth", () => Replace(db.NetWorthEntries, netWorth)));
+        if (backup.Investments is { } investments) jobs.Add(("investments", () => Replace(db.Investments, investments)));
+        if (backup.Accounts is { } accounts) jobs.Add(("accounts", () => Replace(db.Accounts, accounts)));
+
+        if (await GuardOverwrite(confirm, jobs.Select(j => j.Key)) is { } blocked) return blocked;
+
         var inserted = new Dictionary<string, int>();
-        if (backup.Expenses is not null) { await Replace(db.Expenses, backup.Expenses); inserted["expenses"] = backup.Expenses.Count; }
-        if (backup.Income is not null) { await Replace(db.Incomes, backup.Income); inserted["income"] = backup.Income.Count; }
-        if (backup.FixedCosts is not null) { await Replace(db.FixedCosts, backup.FixedCosts); inserted["fixedCosts"] = backup.FixedCosts.Count; }
-        if (backup.Debts is not null) { await Replace(db.Debts, backup.Debts); inserted["debts"] = backup.Debts.Count; }
-        if (backup.NetWorth is not null) { await Replace(db.NetWorthEntries, backup.NetWorth); inserted["netWorth"] = backup.NetWorth.Count; }
-        if (backup.Investments is not null) { await Replace(db.Investments, backup.Investments); inserted["investments"] = backup.Investments.Count; }
-        if (backup.Accounts is not null) { await Replace(db.Accounts, backup.Accounts); inserted["accounts"] = backup.Accounts.Count; }
+        foreach (var (key, run) in jobs) inserted[key] = await run();
         await db.SaveChangesAsync();
         return new ImportResultDto("Import complete.", inserted);
     }
@@ -97,8 +109,10 @@ public class ImportController(AppDbContext db) : ControllerBase
 
     /// <summary>Delete everything. Handy before a fresh import.</summary>
     [HttpPost("import/reset")]
-    public async Task<ActionResult<ImportResultDto>> Reset()
+    public async Task<ActionResult<ImportResultDto>> Reset([FromQuery] bool confirm = false)
     {
+        if (await GuardOverwrite(confirm, AllTables) is { } blocked) return blocked;
+
         db.Expenses.RemoveRange(db.Expenses);
         db.Incomes.RemoveRange(db.Incomes);
         db.FixedCosts.RemoveRange(db.FixedCosts);
@@ -109,6 +123,52 @@ public class ImportController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         return new ImportResultDto("All data cleared.", new());
     }
+
+    // ---- overwrite guard -----------------------------------------------------
+
+    private static readonly string[] AllTables =
+        ["expenses", "income", "fixedCosts", "debts", "netWorth", "investments", "accounts"];
+
+    /// <summary>
+    /// Active outside local development. Deliberately keyed off "not Development"
+    /// rather than "is Production" so an unexpected environment name fails safe:
+    /// Azure App Service sets no ASPNETCORE_ENVIRONMENT, so it lands on Production.
+    /// </summary>
+    private bool GuardActive => !env.IsDevelopment();
+
+    /// <summary>
+    /// Returns a 409 Conflict result when the caller is about to destroy rows that
+    /// already exist and has not confirmed. Returns null when the import may proceed.
+    /// </summary>
+    private async Task<ActionResult?> GuardOverwrite(bool confirm, IEnumerable<string> targets)
+    {
+        if (confirm || !GuardActive) return null;
+
+        var existing = new Dictionary<string, int>();
+        foreach (var key in targets)
+        {
+            var rows = await CountRows(key);
+            if (rows > 0) existing[key] = rows;
+        }
+        if (existing.Count == 0) return null;
+
+        return Conflict(new OverwriteGuardDto(
+            "This would permanently delete data that is already stored. Retry with confirm=true to proceed.",
+            RequiresConfirmation: true,
+            existing));
+    }
+
+    private Task<int> CountRows(string table) => table switch
+    {
+        "expenses" => db.Expenses.CountAsync(),
+        "income" => db.Incomes.CountAsync(),
+        "fixedCosts" => db.FixedCosts.CountAsync(),
+        "debts" => db.Debts.CountAsync(),
+        "netWorth" => db.NetWorthEntries.CountAsync(),
+        "investments" => db.Investments.CountAsync(),
+        "accounts" => db.Accounts.CountAsync(),
+        _ => Task.FromResult(0),
+    };
 
     // ---- helpers -------------------------------------------------------------
 

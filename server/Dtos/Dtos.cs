@@ -28,3 +28,11 @@ public record DashboardDto(
 
 /// <summary>Result of an import/reset operation: a message plus rows affected per table.</summary>
 public record ImportResultDto(string Message, Dictionary<string, int> Inserted);
+
+/// <summary>
+/// Returned with 409 Conflict when a destructive import would wipe rows that already
+/// exist. <see cref="Existing"/> maps each affected table to the number of rows that
+/// would be deleted, so the caller can show the user exactly what is at stake before
+/// retrying with confirm=true.
+/// </summary>
+public record OverwriteGuardDto(string Message, bool RequiresConfirmation, Dictionary<string, int> Existing);

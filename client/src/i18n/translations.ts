@@ -109,6 +109,10 @@ export const en = {
   'import.danger.body': 'Clear everything and start fresh. Export a backup first.',
   'import.danger.button': 'Delete all data',
   'import.confirmReset': 'Delete ALL data from the app database? Export a backup first if unsure.',
+  'import.confirmOverwrite':
+    'This import will permanently delete data that is already stored:\n\n{rows}\n\n'
+    + 'Those rows cannot be recovered unless you have a JSON backup. Continue?',
+  'import.cancelled': 'Import cancelled — nothing was changed.',
   'import.result': '{message} Loaded {parts}.',
   'import.resultNothing': 'nothing',
   'import.backupDownloaded': 'Backup downloaded.',
@@ -257,6 +261,10 @@ export const pt: Record<TranslationKey, string> = {
   'import.danger.button': 'Eliminar todos os dados',
   'import.confirmReset':
     'Eliminar TODOS os dados da base de dados da aplicação? Exporte primeiro uma cópia de segurança se tiver dúvidas.',
+  'import.confirmOverwrite':
+    'Esta importação vai eliminar definitivamente dados que já estão guardados:\n\n{rows}\n\n'
+    + 'Essas linhas não podem ser recuperadas sem uma cópia de segurança JSON. Continuar?',
+  'import.cancelled': 'Importação cancelada — nada foi alterado.',
   'import.result': '{message} Carregado {parts}.',
   'import.resultNothing': 'nada',
   'import.backupDownloaded': 'Cópia de segurança descarregada.',

@@ -1,10 +1,22 @@
 // Thin fetch wrapper. In dev, Vite proxies /api to the .NET server;
 // in production the SPA is served by the same server, so relative URLs work.
 
+/** Error that keeps the status code and parsed body so callers can react to specific failures. */
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string, readonly body: unknown) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(text || `${res.status} ${res.statusText}`)
+    let body: unknown = null
+    try { body = text ? JSON.parse(text) : null } catch { /* plain-text error, keep body null */ }
+    const parsed = body as { message?: string; title?: string } | null
+    const message = parsed?.message || parsed?.title || text || `${res.status} ${res.statusText}`
+    throw new ApiError(res.status, message, body)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

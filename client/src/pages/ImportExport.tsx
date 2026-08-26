@@ -1,8 +1,22 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { api } from '../api'
+import { api, ApiError } from '../api'
 import { useI18n } from '../i18n'
+import { resources } from '../resources'
 
 interface ImportResult { message: string; inserted: Record<string, number> }
+
+/** Body the server returns with 409 when an import would destroy existing rows. */
+interface OverwriteGuard {
+  message: string
+  requiresConfirmation: boolean
+  existing: Record<string, number>
+}
+
+function asOverwriteGuard(e: unknown): OverwriteGuard | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null
+  const body = e.body as OverwriteGuard | null
+  return body?.requiresConfirmation ? body : null
+}
 
 export default function ImportExport() {
   const { t } = useI18n()
@@ -21,12 +35,44 @@ export default function ImportExport() {
     }))
   }
 
+  /** Server table keys are the resource keys in camelCase, e.g. netWorth -> networth. */
+  function tableLabel(key: string) {
+    const res = resources[key.toLowerCase()]
+    return res ? t(res.titleKey) : key
+  }
+
+  const query = (confirm: boolean) => (confirm ? '?confirm=true' : '')
+
+  /**
+   * Runs a destructive import. Outside local development the server refuses the first
+   * attempt if rows would be lost, so we spell out exactly what is at stake and only
+   * retry when the user agrees. Resolves to null when they back out.
+   */
+  async function runGuarded(call: (confirmed: boolean) => Promise<ImportResult>): Promise<ImportResult | null> {
+    try {
+      return await call(false)
+    } catch (e) {
+      const guard = asOverwriteGuard(e)
+      if (!guard) throw e
+      const rows = Object.entries(guard.existing)
+        .map(([key, count]) => `• ${count} × ${tableLabel(key)}`)
+        .join('\n')
+      if (!confirm(t('import.confirmOverwrite', { rows }))) return null
+      return await call(true)
+    }
+  }
+
+  function report(r: ImportResult | null) {
+    if (r) summarize(r)
+    else setOk(t('import.cancelled'))
+  }
+
   async function onExcel(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     reset(); setBusy(true)
     try {
-      summarize(await api.upload<ImportResult>('import/excel', file))
+      report(await runGuarded(c => api.upload<ImportResult>(`import/excel${query(c)}`, file)))
     } catch (e2) {
       setErr((e2 as Error).message)
     } finally {
@@ -41,7 +87,7 @@ export default function ImportExport() {
     reset(); setBusy(true)
     try {
       const parsed = JSON.parse(await file.text())
-      summarize(await api.post<ImportResult>('import/json', parsed))
+      report(await runGuarded(c => api.post<ImportResult>(`import/json${query(c)}`, parsed)))
     } catch (e2) {
       setErr((e2 as Error).message)
     } finally {
@@ -69,10 +115,12 @@ export default function ImportExport() {
   }
 
   async function resetAll() {
+    // Deleting is the whole point of this button, so its own prompt is the confirmation
+    // the server guard asks for — sending confirm=true avoids a redundant second dialog.
     if (!confirm(t('import.confirmReset'))) return
     reset(); setBusy(true)
     try {
-      await api.post<ImportResult>('import/reset', {})
+      await api.post<ImportResult>('import/reset?confirm=true', {})
       setOk(t('import.allCleared'))
     } catch (e2) {
       setErr((e2 as Error).message)
