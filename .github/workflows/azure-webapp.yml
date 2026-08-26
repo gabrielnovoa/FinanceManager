@@ -23,7 +23,7 @@ concurrency:
 env:
   AZURE_WEBAPP_NAME: finance-tn
   DOTNET_VERSION: '8.0.x'
-  NODE_VERSION: '20.x'
+  NODE_VERSION: '24.x'
 
 jobs:
   build-and-deploy:
