@@ -2,9 +2,11 @@
 // language. `en` is the source of truth: `pt` is typed against it, so a missing
 // or misspelled Portuguese key is a compile error rather than a runtime blank.
 
+// Flags are drawn as inline SVG (see components/Flag.tsx) because Windows has
+// no flag emoji font — the emoji would render as bare "GB" / "PT" letters.
 export const languages = {
-  en: { label: 'English', flag: '🇬🇧', locale: 'en-GB' },
-  pt: { label: 'Português', flag: '🇵🇹', locale: 'pt-PT' },
+  en: { label: 'English', locale: 'en-GB' },
+  pt: { label: 'Português', locale: 'pt-PT' },
 } as const
 
 export type Language = keyof typeof languages
@@ -13,8 +15,10 @@ export const en = {
   // ---- Navigation / shell ----
   'nav.dashboard': 'Dashboard',
   'nav.importExport': 'Import / Export',
-  'layout.footer': 'Finance Manager · runs locally & on Azure',
   'lang.label': 'Language',
+  'account.welcome': 'Welcome, {name}',
+  'nav.openMenu': 'Open menu',
+  'nav.closeMenu': 'Close menu',
 
   // ---- Shared ----
   'common.other': 'Other',
@@ -156,8 +160,10 @@ export const pt: Record<TranslationKey, string> = {
   // ---- Navegação / estrutura ----
   'nav.dashboard': 'Painel',
   'nav.importExport': 'Importar / Exportar',
-  'layout.footer': 'Finance Manager · corre localmente e no Azure',
   'lang.label': 'Idioma',
+  'account.welcome': 'Bem-vindo, {name}',
+  'nav.openMenu': 'Abrir menu',
+  'nav.closeMenu': 'Fechar menu',
 
   // ---- Comum ----
   'common.other': 'Outros',

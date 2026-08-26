@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Finance Manager">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b82f6" />
+      <stop offset="1" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="15" fill="url(#bg)" />
+
+  <!-- Euro sign: the app formats every amount in EUR. Drawn as strokes rather than
+       text so it renders identically without depending on the viewer's fonts, and
+       stays legible down to 16px. -->
+  <g fill="none" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round">
+    <path d="M43 21.5 A13.5 13.5 0 1 0 43 42.5" />
+    <path d="M17 28 H38" />
+    <path d="M17 36 H38" />
+  </g>
+</svg>
