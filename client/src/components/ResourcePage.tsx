@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import { useI18n } from '../i18n'
 import type { Field, Resource } from '../resources'
-import DataTable, { isNumeric, type Row } from './DataTable'
+import DataTable, { inputType, isNumeric, type Row } from './DataTable'
 
 export default function ResourcePage({ resource }: { resource: Resource }) {
   const { t } = useI18n()
@@ -56,6 +56,20 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
     }
   }
 
+  // The API replaces the whole row, so the body carries every field plus the
+  // id. Rethrowing lets the table keep the row open when a save fails.
+  async function update(id: number, values: Record<string, unknown>) {
+    setError(null)
+    const body = { ...coerce(values, resource.fields), id }
+    try {
+      await api.put(`${resource.endpoint}/${id}`, body)
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...body } : r)))
+    } catch (err) {
+      setError((err as Error).message)
+      throw err
+    }
+  }
+
   return (
     <div>
       <h1 className="page-title">{resource.icon} {t(resource.titleKey)}</h1>
@@ -96,13 +110,13 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
         groupBy={resource.groupBy}
         onRefresh={load}
         onDelete={remove}
+        onUpdate={update}
       />
     </div>
   )
 }
 
 // ---- helpers ----
-function inputType(t: Field['type']) { return t === 'date' ? 'date' : isNumeric(t) ? 'number' : 'text' }
 
 function coerce(form: Record<string, unknown>, fields: Field[]) {
   const out: Record<string, unknown> = {}

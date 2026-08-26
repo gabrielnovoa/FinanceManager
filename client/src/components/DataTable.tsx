@@ -1,15 +1,17 @@
 // The table used by every resource page. On top of plain rendering it adds
-// three things the raw list was missing once real spreadsheets got imported:
-// per-column sorting, per-column filtering, and collapsible month/year groups.
+// four things the raw list was missing once real spreadsheets got imported:
+// per-column sorting, per-column filtering, collapsible month/year groups,
+// and inline row editing.
 //
 // All of it is client-side — these tables are a few thousand rows at most, so
 // there is no need to push sorting and filtering into the API.
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
 import type { Formatters } from '../format'
 import { languages, useI18n } from '../i18n'
 import type { Translate } from '../i18n'
 import type { Field, FieldType } from '../resources'
+import Icon from './Icon'
 
 export type Row = Record<string, unknown> & { id: number }
 
@@ -26,12 +28,14 @@ interface Props {
   groupBy?: string
   onRefresh: () => void
   onDelete: (id: number) => void
+  /** Must reject on failure so the row stays open and the edit is not lost. */
+  onUpdate: (id: number, values: Record<string, unknown>) => Promise<void>
 }
 
 const NO_DATE = '__nodate__'
 
 export default function DataTable({
-  fields, rows, loading, totalField, groupBy, onRefresh, onDelete,
+  fields, rows, loading, totalField, groupBy, onRefresh, onDelete, onUpdate,
 }: Props) {
   const { t, fmt, language } = useI18n()
   const locale = languages[language].locale
@@ -42,6 +46,13 @@ export default function DataTable({
   // Absent key = use the default (only the first group starts open), so groups
   // that appear later after a refresh still behave sensibly.
   const [openOverrides, setOpenOverrides] = useState<Record<string, boolean>>({})
+
+  // ---- inline editing ----
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [savingRow, setSavingRow] = useState(false)
+  const [invalid, setInvalid] = useState<string[]>([])
+  const [editError, setEditError] = useState<string | null>(null)
 
   const typeOf = useMemo(() => {
     const map: Record<string, FieldType> = {}
@@ -117,14 +128,70 @@ export default function DataTable({
   const setAllOpen = (open: boolean) =>
     setOpenOverrides(Object.fromEntries((groups ?? []).map((g) => [g.key, open])))
 
+  function startEdit(row: Row) {
+    setEditingId(row.id)
+    setDraft(Object.fromEntries(fields.map((f) => [f.key, editValue(row[f.key], f.type)])))
+    setInvalid([])
+    setEditError(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setDraft({})
+    setInvalid([])
+    setEditError(null)
+  }
+
+  async function saveEdit() {
+    if (editingId === null || savingRow) return
+
+    const missing = fields
+      .filter((f) => f.required && String(draft[f.key] ?? '').trim() === '')
+      .map((f) => f.key)
+    if (missing.length > 0) {
+      setInvalid(missing)
+      setEditError(t('table.requiredMissing'))
+      return
+    }
+
+    setSavingRow(true)
+    setEditError(null)
+    try {
+      await onUpdate(editingId, draft)
+      cancelEdit() // only close on success, so a failed save never loses input
+    } catch (err) {
+      setEditError((err as Error).message)
+    } finally {
+      setSavingRow(false)
+    }
+  }
+
   const countLabel = loading
     ? t('common.loading')
     : activeFilters.length > 0
       ? t('table.showingOf', { shown: sorted.length, total: rows.length })
       : t(rows.length === 1 ? 'common.entryCount' : 'common.entryCountPlural', { count: rows.length })
 
+  const rowProps = {
+    fields,
+    fmt,
+    t,
+    editingId,
+    draft,
+    invalid,
+    savingRow,
+    onEdit: startEdit,
+    onCancel: cancelEdit,
+    onSave: saveEdit,
+    onDelete,
+    onDraftChange: (key: string, value: string) =>
+      setDraft((cur) => ({ ...cur, [key]: value })),
+  }
+
   return (
     <>
+      {editError && <div className="alert err">{editError}</div>}
+
       <div className="toolbar">
         <span className="count">{countLabel}</span>
         {activeFilters.length > 0 && (
@@ -235,15 +302,13 @@ export default function DataTable({
                         </td>
                       </tr>
                       {open && g.items.map((r) => (
-                        <DataRow key={r.id} row={r} fields={fields} fmt={fmt}
-                                 onDelete={onDelete} deleteLabel={t('common.delete')} />
+                        <DataRow key={r.id} row={r} {...rowProps} />
                       ))}
                     </Fragment>
                   )
                 })
               : sorted.map((r) => (
-                  <DataRow key={r.id} row={r} fields={fields} fmt={fmt}
-                           onDelete={onDelete} deleteLabel={t('common.delete')} />
+                  <DataRow key={r.id} row={r} {...rowProps} />
                 ))}
 
             {!loading && sorted.length === 0 && (
@@ -270,20 +335,103 @@ export default function DataTable({
   )
 }
 
-function DataRow({ row, fields, fmt, onDelete, deleteLabel }: {
+interface RowProps {
   row: Row
   fields: Field[]
   fmt: Formatters
+  t: Translate
+  editingId: number | null
+  draft: Record<string, string>
+  invalid: string[]
+  savingRow: boolean
+  onEdit: (row: Row) => void
+  onCancel: () => void
+  onSave: () => void
   onDelete: (id: number) => void
-  deleteLabel: string
-}) {
+  onDraftChange: (key: string, value: string) => void
+}
+
+function DataRow({
+  row, fields, fmt, t, editingId, draft, invalid, savingRow,
+  onEdit, onCancel, onSave, onDelete, onDraftChange,
+}: RowProps) {
+  const editing = editingId === row.id
+  // Editing is one row at a time: while a row is open every other row's
+  // buttons are disabled, so an edit can never be dropped by a stray click.
+  const locked = editingId !== null && !editing
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); onSave() }
+    else if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+  }
+
   return (
-    <tr>
-      {fields.map((f) => (
-        <td key={f.key} className={isNumeric(f.type) ? 'num' : ''}>{cell(row[f.key], f, fmt)}</td>
+    <tr className={editing ? 'editing' : undefined}>
+      {fields.map((f, i) => (
+        <td key={f.key} className={isNumeric(f.type) ? 'num' : ''}>
+          {editing ? (
+            <input
+              className={`cell-input${invalid.includes(f.key) ? ' invalid' : ''}`}
+              type={inputType(f.type)}
+              step={isNumeric(f.type) ? 'any' : undefined}
+              value={draft[f.key] ?? ''}
+              autoFocus={i === 0}
+              disabled={savingRow}
+              aria-label={t(f.labelKey)}
+              aria-invalid={invalid.includes(f.key) || undefined}
+              onChange={(e) => onDraftChange(f.key, e.target.value)}
+              onKeyDown={onKeyDown}
+            />
+          ) : (
+            cell(row[f.key], f, fmt)
+          )}
+        </td>
       ))}
+
       <td className="row-actions">
-        <button className="link-btn" onClick={() => onDelete(row.id)}>{deleteLabel}</button>
+        {editing ? (
+          <>
+            <button
+              className="icon-btn ok"
+              onClick={onSave}
+              disabled={savingRow}
+              title={t('table.saveRow')}
+              aria-label={t('common.save')}
+            >
+              <Icon name="save" />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={onCancel}
+              disabled={savingRow}
+              title={t('table.cancelEdit')}
+              aria-label={t('common.cancel')}
+            >
+              <Icon name="cancel" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="icon-btn"
+              onClick={() => onEdit(row)}
+              disabled={locked}
+              title={locked ? t('table.finishEditFirst') : t('table.editRow')}
+              aria-label={t('common.edit')}
+            >
+              <Icon name="edit" />
+            </button>
+            <button
+              className="icon-btn danger"
+              onClick={() => onDelete(row.id)}
+              disabled={locked}
+              title={locked ? t('table.finishEditFirst') : t('table.deleteRow')}
+              aria-label={t('common.delete')}
+            >
+              <Icon name="delete" />
+            </button>
+          </>
+        )}
       </td>
     </tr>
   )
@@ -293,6 +441,21 @@ function DataRow({ row, fields, fmt, onDelete, deleteLabel }: {
 
 export function isNumeric(type: FieldType) {
   return type === 'money' || type === 'number' || type === 'int'
+}
+
+/** Which native input a field type should use, for both the add form and inline edit. */
+export function inputType(type: FieldType) {
+  return type === 'date' ? 'date' : isNumeric(type) ? 'number' : 'text'
+}
+
+/**
+ * Stored value -> what the edit input expects: raw numbers rather than the
+ * formatted currency shown in read mode, and a bare yyyy-MM-dd for date inputs.
+ */
+function editValue(value: unknown, type: FieldType): string {
+  if (isBlank(value)) return ''
+  if (type === 'date') return String(value).slice(0, 10)
+  return String(value)
 }
 
 export function cell(value: unknown, f: Field, fmt: Formatters) {
