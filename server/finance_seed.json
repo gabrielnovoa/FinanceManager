@@ -1,5 +1,5 @@
 {
- "_comment": "Seed data loaded automatically on first run when the database is empty. Starts empty because the source workbook was password-protected. Populate it by using the in-app 'Import' page (Excel or JSON), or by pasting exported JSON here in this exact shape.",
+ "_comment": "Seed data loaded automatically on first run when the database is empty. Starts empty on purpose. Populate it by using the in-app 'Import / Export' page (statement import or JSON restore), or by pasting exported JSON here in this exact shape.",
  "expenses": [],
  "income": [],
  "fixedCosts": [],

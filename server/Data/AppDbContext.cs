@@ -14,6 +14,19 @@ public class AppDbContext : DbContext
     public DbSet<NetWorthEntry> NetWorthEntries => Set<NetWorthEntry>();
     public DbSet<Investment> Investments => Set<Investment>();
     public DbSet<BankAccount> Accounts => Set<BankAccount>();
+    public DbSet<ClassificationAlias> ClassificationAliases => Set<ClassificationAlias>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ClassificationAlias>(e =>
+        {
+            e.Property(x => x.Pattern).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Item).HasMaxLength(200);
+            e.Property(x => x.Category).HasMaxLength(200);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Pattern).IsUnique();
+        });
+    }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

@@ -8,7 +8,7 @@ are already in the build.
 
 - ✅ **Dashboard with KPIs + interactive charts** (income vs expenses, category &
   source breakdowns, net-worth and debt trends, savings rate).
-- ✅ **Excel & JSON import / export** so data is never trapped.
+- ✅ **Statement import & JSON backup / restore** so data is never trapped.
 - **Monthly budget targets + alerts.** Set a cap per category; the dashboard
   highlights categories over budget for the month. Highest-value next feature for
   a budgeting tool.

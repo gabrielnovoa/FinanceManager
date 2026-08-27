@@ -1,6 +1,6 @@
 # 📊 Finance Manager
 
-A personal budgeting web app built around your `Finance.xlsx` structure. Add and
+A personal budgeting web app built around a spreadsheet-style structure. Add and
 delete records, explore interactive reports and charts, and deploy it to Azure.
 
 - **Frontend:** React 18 + TypeScript + Vite + Recharts
@@ -15,9 +15,9 @@ delete records, explore interactive reports and charts, and deploy it to Azure.
 |------|---------|
 | **Dashboard** | KPIs (income, expenses, net, savings rate, fixed/month, net worth, total debt), monthly income-vs-expenses chart, expenses by category (donut) and by source, net-worth trend, debt trend, year filter |
 | **Data pages** | Full add/delete for Expenses, Income, Fixed Costs, Debts, Net Worth, Investments, Bank Accounts — each with running totals |
-| **Import / Export** | Upload your `Finance.xlsx`, restore/export a JSON backup, or reset everything |
+| **Import / Export** | Import a bank/card statement with automatic classification, back up and restore everything as JSON, or reset |
 
-Every table mirrors a sheet from your workbook:
+Every table mirrors a sheet from the original workbook:
 
 | App page | Workbook sheet | Fields |
 |----------|----------------|--------|
@@ -33,18 +33,19 @@ Every table mirrors a sheet from your workbook:
 
 ## ⚠️ Loading your data
 
-The app **starts empty on purpose** — the `Finance.xlsx` provided was
-password-protected, so its rows couldn't be read automatically. Load it yourself
-in seconds:
+The app **starts empty on purpose**. There are three ways to fill it:
 
-1. In Excel, remove the password: **File → Info → Protect Workbook → Encrypt with
-   Password**, clear the box, and save.
-2. Start the app (below), open **Import / Export**, and upload the `.xlsx`.
-3. Done — every matching sheet is imported and the dashboard fills in.
+1. **Type it in** — every page has an add form, plus a *repeat last month* button
+   for the recurring rows (Net Worth, Investments, Debts).
+2. **Import a statement** — open **Import / Export** and upload a `.xls`/`.xlsx`
+   statement from your bank or card. Each line is split into income or expense and
+   classified from your own history, then shown for review before anything is saved.
+3. **Restore a backup** — drop a previously exported `.json` file on the
+   **Data backup** card. You see a table-by-table comparison of what changes
+   before it is written.
 
-You can re-import any time (it replaces the matching tables), and **Export backup
-(JSON)** gives you a portable snapshot you can restore or drop into
-`server/finance_seed.json` to auto-load on a fresh database.
+**Download backup** gives you a portable snapshot you can restore later or drop
+into `server/finance_seed.json` to auto-load on a fresh database.
 
 ---
 
@@ -185,7 +186,8 @@ FinanceManager/
 |--------|-------|---------|
 | GET/POST/PUT/DELETE | `/api/expenses` (and `income`, `fixedcosts`, `debts`, `networth`, `investments`, `accounts`) | CRUD per table |
 | GET | `/api/dashboard/summary?year=2025` | All KPIs, series and breakdowns |
-| POST | `/api/import/excel` | Upload an unlocked `.xlsx` |
+| POST | `/api/statement/preview` · `/api/statement/commit` | Classify a statement, then save the reviewed lines |
+| GET | `/api/backup/summary` | Row count per table |
 | POST | `/api/import/json` · GET `/api/export/json` | Restore / back up |
 | POST | `/api/import/reset` | Clear all data |
 
@@ -197,7 +199,8 @@ In development, Swagger UI is at `http://localhost:5080/swagger`.
 
 **Built in beyond the basics:** savings-rate KPI, fixed-cost monthly load,
 net-worth and debt trend lines, category/source breakdowns, year filtering,
-Excel **and** JSON import, one-click backup export, provider-agnostic storage.
+statement import with automatic classification, JSON backup and restore with a
+before/after comparison, provider-agnostic storage.
 
 **Natural next steps** (see `IDEAS.md`): monthly budget targets with
 over-budget alerts, recurring-expense auto-entry from Fixed Costs, debt-payoff

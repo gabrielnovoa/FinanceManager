@@ -108,29 +108,68 @@ export const en = {
 
   // ---- Import / Export ----
   'import.title': 'Import / Export',
-  'import.subtitle': 'Load your spreadsheet, restore a backup, or export everything.',
-  'import.excel.title': '📥 Import from Excel',
-  'import.excel.body':
-    'Upload your Finance.xlsx. Matching sheets (Despesas, Receitas, Gastos Fixos, Dívidas, Patrimônio, Investimentos, Contas Bancárias) replace the current data.',
-  'import.excel.note':
-    'The file must not be password-protected. In Excel: File → Info → Protect Workbook → Encrypt with Password, clear the box, and save.',
-  'import.json.title': '🗂️ Import / Export JSON',
-  'import.json.body': 'Restore a JSON backup, or download everything currently in the app.',
-  'import.json.export': '⬇ Export backup (JSON)',
-  'import.json.restore': 'Restore from JSON:',
+  'import.subtitle': 'Back up your data, restore it, or bring in a bank statement.',
   'import.danger.title': '🧹 Danger zone',
   'import.danger.body': 'Clear everything and start fresh. Export a backup first.',
   'import.danger.button': 'Delete all data',
   'import.confirmReset': 'Delete ALL data from the app database? Export a backup first if unsure.',
-  'import.confirmOverwrite':
-    'This import will permanently delete data that is already stored:\n\n{rows}\n\n'
-    + 'Those rows cannot be recovered unless you have a JSON backup. Continue?',
-  'import.cancelled': 'Import cancelled — nothing was changed.',
-  'import.result': '{message} Loaded {parts}.',
-  'import.resultNothing': 'nothing',
-  'import.backupDownloaded': 'Backup downloaded.',
   'import.allCleared': 'All data cleared.',
   'import.exportFailed': 'Export failed',
+
+  // ---- Backup ----
+  'backup.title': '💾 Data backup',
+  'backup.body': 'Everything the app holds, in a single JSON file you can keep anywhere.',
+  'backup.exportHeading': 'Export',
+  'backup.lastExport': 'Last backup: {when}',
+  'backup.neverExported': 'No backup taken yet.',
+  'backup.empty': 'Nothing to export yet.',
+  'backup.export': '⬇ Download backup',
+  'backup.downloaded': 'Backup downloaded — {count} rows.',
+  'backup.restoreHeading': 'Restore',
+  'backup.restoreHint': 'You get to review what changes before anything is written.',
+  'backup.drop': 'Drop a backup here',
+  'backup.dropHint': 'or click to choose a .json file',
+  'backup.badFile': '“{file}” is not a backup from this app.',
+  'backup.restoreTitle': 'Restore — {file}',
+  'backup.restoreIntro':
+    'Each table in the file replaces the one in the app. Tables the file does not contain are left alone.',
+  'backup.colTable': 'Table',
+  'backup.colNow': 'In the app',
+  'backup.colFile': 'In the file',
+  'backup.colAfter': 'After restoring',
+  'backup.warnLoss': 'This restore removes rows: {rows}. They cannot be recovered.',
+  'backup.warnMissing': 'Not in this file, so it stays as it is: {rows}.',
+  'backup.restoreConfirm': 'Restore {count} rows',
+  'backup.restored': 'Restored {parts}.',
+
+  // ---- Statement import ----
+  'statement.title': '🏦 Import bank statement',
+  'statement.body':
+    'Upload a Millennium or Wizink statement. Each line is sorted into income or expense and classified from your own history, then shown for review before anything is saved.',
+  'statement.nameHint': 'Name the file after its source — Millenium, Prestige Gold, TAP or Wizink.',
+  'statement.reviewTitle': 'Review — {file}',
+  'statement.source': 'Account / card',
+  'statement.sourceDetected': 'Detected from the file name: {source}.',
+  'statement.sourceUnknown': 'Could not tell from the file name — pick the account or card.',
+  'statement.description': 'Description',
+  'statement.kind': 'Type',
+  'statement.kindIncome': 'Income',
+  'statement.kindExpense': 'Expense',
+  'statement.kindIgnore': 'Ignore',
+  'statement.countIncome': '{count} income',
+  'statement.countExpense': '{count} expenses',
+  'statement.countIgnored': '{count} ignored',
+  'statement.countDuplicates': '{count} duplicates',
+  'statement.duplicate': 'already imported',
+  'statement.new': 'new',
+  'statement.showIgnored': 'Show ignored',
+  'statement.hideIgnored': 'Hide ignored',
+  'statement.duplicateNotice':
+    '{count} line(s) look like transactions you already have. They are unticked — tick one if it really happened twice.',
+  'statement.totals': 'In {income} · Out {expense}',
+  'statement.missingItems': '{count} selected line(s) still need an item. Fill them in or untick them.',
+  'statement.confirm': 'Import {count} line(s)',
+  'statement.committed': 'Imported {incomes} income and {expenses} expense rows. Learned {rules} new rule(s).',
 
   // ---- Resource pages ----
   'res.expenses.title': 'Expenses',
@@ -271,31 +310,69 @@ export const pt: Record<TranslationKey, string> = {
   // ---- Importar / Exportar ----
   'import.title': 'Importar / Exportar',
   'import.subtitle':
-    'Carregue a sua folha de cálculo, restaure uma cópia de segurança ou exporte tudo.',
-  'import.excel.title': '📥 Importar do Excel',
-  'import.excel.body':
-    'Carregue o seu Finance.xlsx. As folhas correspondentes (Despesas, Receitas, Gastos Fixos, Dívidas, Patrimônio, Investimentos, Contas Bancárias) substituem os dados atuais.',
-  'import.excel.note':
-    'O ficheiro não pode estar protegido por palavra-passe. No Excel: Ficheiro → Informações → Proteger Livro → Encriptar com Palavra-passe, limpe a caixa e guarde.',
-  'import.json.title': '🗂️ Importar / Exportar JSON',
-  'import.json.body':
-    'Restaure uma cópia de segurança JSON ou descarregue tudo o que está na aplicação.',
-  'import.json.export': '⬇ Exportar cópia de segurança (JSON)',
-  'import.json.restore': 'Restaurar a partir de JSON:',
+    'Guarda uma cópia dos teus dados, restaura-a ou importa um extrato bancário.',
   'import.danger.title': '🧹 Zona de perigo',
   'import.danger.body': 'Apague tudo e comece do zero. Exporte primeiro uma cópia de segurança.',
   'import.danger.button': 'Eliminar todos os dados',
   'import.confirmReset':
     'Eliminar TODOS os dados da base de dados da aplicação? Exporte primeiro uma cópia de segurança se tiver dúvidas.',
-  'import.confirmOverwrite':
-    'Esta importação vai eliminar definitivamente dados que já estão guardados:\n\n{rows}\n\n'
-    + 'Essas linhas não podem ser recuperadas sem uma cópia de segurança JSON. Continuar?',
-  'import.cancelled': 'Importação cancelada — nada foi alterado.',
-  'import.result': '{message} Carregado {parts}.',
-  'import.resultNothing': 'nada',
-  'import.backupDownloaded': 'Cópia de segurança descarregada.',
   'import.allCleared': 'Todos os dados foram eliminados.',
   'import.exportFailed': 'A exportação falhou',
+
+  // ---- Cópia de segurança ----
+  'backup.title': '💾 Cópia de segurança',
+  'backup.body': 'Tudo o que a aplicação tem, num único ficheiro JSON que podes guardar onde quiseres.',
+  'backup.exportHeading': 'Exportar',
+  'backup.lastExport': 'Última cópia: {when}',
+  'backup.neverExported': 'Ainda não fizeste nenhuma cópia.',
+  'backup.empty': 'Ainda não há nada para exportar.',
+  'backup.export': '⬇ Descarregar cópia',
+  'backup.downloaded': 'Cópia descarregada — {count} registos.',
+  'backup.restoreHeading': 'Restaurar',
+  'backup.restoreHint': 'Vais poder rever o que muda antes de alguma coisa ser gravada.',
+  'backup.drop': 'Larga aqui uma cópia',
+  'backup.dropHint': 'ou clica para escolher um ficheiro .json',
+  'backup.badFile': '«{file}» não é uma cópia de segurança desta aplicação.',
+  'backup.restoreTitle': 'Restaurar — {file}',
+  'backup.restoreIntro':
+    'Cada tabela do ficheiro substitui a que está na aplicação. As tabelas que o ficheiro não traz ficam intactas.',
+  'backup.colTable': 'Tabela',
+  'backup.colNow': 'Na aplicação',
+  'backup.colFile': 'No ficheiro',
+  'backup.colAfter': 'Depois de restaurar',
+  'backup.warnLoss': 'Este restauro elimina registos: {rows}. Não há como os recuperar.',
+  'backup.warnMissing': 'Não vem neste ficheiro, por isso fica como está: {rows}.',
+  'backup.restoreConfirm': 'Restaurar {count} registos',
+  'backup.restored': 'Restaurado {parts}.',
+
+  // ---- Statement import ----
+  'statement.title': '🏦 Importar extrato bancário',
+  'statement.body':
+    'Carrega um extrato Millennium ou Wizink. Cada linha é separada em receita ou despesa e classificada a partir do teu próprio histórico, e depois mostrada para revisão antes de ser guardada.',
+  'statement.nameHint': 'Dá ao ficheiro o nome da origem — Millenium, Prestige Gold, TAP ou Wizink.',
+  'statement.reviewTitle': 'Revisão — {file}',
+  'statement.source': 'Conta / cartão',
+  'statement.sourceDetected': 'Identificado pelo nome do ficheiro: {source}.',
+  'statement.sourceUnknown': 'Não deu para identificar pelo nome do ficheiro — escolhe a conta ou o cartão.',
+  'statement.description': 'Descrição',
+  'statement.kind': 'Tipo',
+  'statement.kindIncome': 'Receita',
+  'statement.kindExpense': 'Despesa',
+  'statement.kindIgnore': 'Ignorar',
+  'statement.countIncome': '{count} receitas',
+  'statement.countExpense': '{count} despesas',
+  'statement.countIgnored': '{count} ignoradas',
+  'statement.countDuplicates': '{count} duplicados',
+  'statement.duplicate': 'já importado',
+  'statement.new': 'novo',
+  'statement.showIgnored': 'Mostrar ignoradas',
+  'statement.hideIgnored': 'Esconder ignoradas',
+  'statement.duplicateNotice':
+    '{count} linha(s) parecem movimentos que já tens. Estão desmarcadas — marca alguma se aconteceu mesmo duas vezes.',
+  'statement.totals': 'Entrou {income} · Saiu {expense}',
+  'statement.missingItems': '{count} linha(s) selecionada(s) ainda estão sem item. Preenche ou desmarca.',
+  'statement.confirm': 'Importar {count} linha(s)',
+  'statement.committed': 'Importadas {incomes} receitas e {expenses} despesas. Aprendidas {rules} nova(s) regra(s).',
 
   // ---- Páginas de dados ----
   'res.expenses.title': 'Despesas',

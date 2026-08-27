@@ -1,39 +1,41 @@
-import { useRef, useState, type ChangeEvent } from 'react'
-import { api, ApiError } from '../api'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { api } from '../api'
 import { useI18n } from '../i18n'
 import { resources } from '../resources'
+import StatementReview, { type StatementPreview } from '../components/StatementReview'
+import BackupRestore, {
+  BACKUP_TABLES, parseBackup, type Backup, type RowCounts,
+} from '../components/BackupRestore'
 
 interface ImportResult { message: string; inserted: Record<string, number> }
 
-/** Body the server returns with 409 when an import would destroy existing rows. */
-interface OverwriteGuard {
-  message: string
-  requiresConfirmation: boolean
-  existing: Record<string, number>
-}
-
-function asOverwriteGuard(e: unknown): OverwriteGuard | null {
-  if (!(e instanceof ApiError) || e.status !== 409) return null
-  const body = e.body as OverwriteGuard | null
-  return body?.requiresConfirmation ? body : null
-}
+/** Remembers when a backup was last downloaded, so the card can say how stale it is. */
+const LAST_BACKUP_KEY = 'financemanager.lastBackup'
 
 export default function ImportExport() {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const [busy, setBusy] = useState(false)
   const [ok, setOk] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const xlsxRef = useRef<HTMLInputElement>(null)
   const jsonRef = useRef<HTMLInputElement>(null)
+  const stmtRef = useRef<HTMLInputElement>(null)
+  const [preview, setPreview] = useState<StatementPreview | null>(null)
+  const [pending, setPending] = useState<{ fileName: string; backup: Backup } | null>(null)
+  const [counts, setCounts] = useState<RowCounts | null>(null)
+  const [lastBackup, setLastBackup] = useState(() => localStorage.getItem(LAST_BACKUP_KEY))
+  const [dragging, setDragging] = useState(false)
+
+  const loadCounts = useCallback(async () => {
+    try {
+      setCounts(await api.get<RowCounts>('backup/summary'))
+    } catch {
+      setCounts({}) // a failed count must not block exporting or restoring
+    }
+  }, [])
+
+  useEffect(() => { void loadCounts() }, [loadCounts])
 
   function reset() { setOk(null); setErr(null) }
-  function summarize(r: ImportResult) {
-    const parts = Object.entries(r.inserted).map(([k, v]) => `${v} ${k}`)
-    setOk(t('import.result', {
-      message: r.message,
-      parts: parts.join(', ') || t('import.resultNothing'),
-    }))
-  }
 
   /** Server table keys are the resource keys in camelCase, e.g. netWorth -> networth. */
   function tableLabel(key: string) {
@@ -41,63 +43,15 @@ export default function ImportExport() {
     return res ? t(res.titleKey) : key
   }
 
-  const query = (confirm: boolean) => (confirm ? '?confirm=true' : '')
+  const totalRows = counts
+    ? BACKUP_TABLES.reduce((sum, k) => sum + (counts[k] ?? 0), 0)
+    : 0
 
-  /**
-   * Runs a destructive import. Outside local development the server refuses the first
-   * attempt if rows would be lost, so we spell out exactly what is at stake and only
-   * retry when the user agrees. Resolves to null when they back out.
-   */
-  async function runGuarded(call: (confirmed: boolean) => Promise<ImportResult>): Promise<ImportResult | null> {
-    try {
-      return await call(false)
-    } catch (e) {
-      const guard = asOverwriteGuard(e)
-      if (!guard) throw e
-      const rows = Object.entries(guard.existing)
-        .map(([key, count]) => `• ${count} × ${tableLabel(key)}`)
-        .join('\n')
-      if (!confirm(t('import.confirmOverwrite', { rows }))) return null
-      return await call(true)
-    }
-  }
-
-  function report(r: ImportResult | null) {
-    if (r) summarize(r)
-    else setOk(t('import.cancelled'))
-  }
-
-  async function onExcel(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    reset(); setBusy(true)
-    try {
-      report(await runGuarded(c => api.upload<ImportResult>(`import/excel${query(c)}`, file)))
-    } catch (e2) {
-      setErr((e2 as Error).message)
-    } finally {
-      setBusy(false)
-      if (xlsxRef.current) xlsxRef.current.value = ''
-    }
-  }
-
-  async function onJson(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    reset(); setBusy(true)
-    try {
-      const parsed = JSON.parse(await file.text())
-      report(await runGuarded(c => api.post<ImportResult>(`import/json${query(c)}`, parsed)))
-    } catch (e2) {
-      setErr((e2 as Error).message)
-    } finally {
-      setBusy(false)
-      if (jsonRef.current) jsonRef.current.value = ''
-    }
-  }
+  // ---- export --------------------------------------------------------------
 
   async function exportJson() {
     reset()
+    setBusy(true)
     try {
       const res = await fetch('/api/export/json')
       if (!res.ok) throw new Error(t('import.exportFailed'))
@@ -108,11 +62,76 @@ export default function ImportExport() {
       a.download = `finance-backup-${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
-      setOk(t('import.backupDownloaded'))
-    } catch (e2) {
-      setErr((e2 as Error).message)
+
+      const now = new Date().toISOString()
+      localStorage.setItem(LAST_BACKUP_KEY, now)
+      setLastBackup(now)
+      setOk(t('backup.downloaded', { count: fmt.int(totalRows) }))
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
     }
   }
+
+  // ---- restore -------------------------------------------------------------
+
+  /**
+   * Opens the comparison panel. Nothing is sent to the server here — the file is
+   * parsed in the browser so the user sees exactly what a restore would replace
+   * before agreeing to it.
+   */
+  async function openBackup(file: File) {
+    reset()
+    setBusy(true)
+    try {
+      setPending({ fileName: file.name, backup: await parseBackup(file) })
+    } catch {
+      setErr(t('backup.badFile', { file: file.name }))
+    } finally {
+      setBusy(false)
+      if (jsonRef.current) jsonRef.current.value = ''
+    }
+  }
+
+  function onJsonInput(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) void openBackup(file)
+  }
+
+  function onDrop(e: DragEvent<HTMLElement>) {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) void openBackup(file)
+  }
+
+  function allowDrop(e: DragEvent<HTMLElement>) {
+    e.preventDefault()
+    setDragging(true)
+  }
+
+  // ---- statements ----------------------------------------------------------
+
+  /**
+   * Parses a bank or card statement and opens the review table. Nothing reaches the
+   * database here — the server classifies and hands the lines back for correction.
+   */
+  async function onStatement(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    reset(); setBusy(true)
+    try {
+      setPreview(await api.upload<StatementPreview>('statement/preview', file))
+    } catch (e2) {
+      setErr((e2 as Error).message)
+    } finally {
+      setBusy(false)
+      if (stmtRef.current) stmtRef.current.value = ''
+    }
+  }
+
+  // ---- danger zone ---------------------------------------------------------
 
   async function resetAll() {
     // Deleting is the whole point of this button, so its own prompt is the confirmation
@@ -122,6 +141,7 @@ export default function ImportExport() {
     try {
       await api.post<ImportResult>('import/reset?confirm=true', {})
       setOk(t('import.allCleared'))
+      await loadCounts()
     } catch (e2) {
       setErr((e2 as Error).message)
     } finally {
@@ -139,22 +159,71 @@ export default function ImportExport() {
 
       <div className="grid chart-grid">
         <div className="card">
-          <h3 className="chart-title">{t('import.excel.title')}</h3>
-          <p className="muted" style={{ fontSize: 14 }}>{t('import.excel.body')}</p>
-          <p className="alert err" style={{ fontSize: 13 }}>{t('import.excel.note')}</p>
-          <input ref={xlsxRef} type="file" accept=".xlsx" onChange={onExcel} disabled={busy} />
+          <h3 className="chart-title">{t('backup.title')}</h3>
+          <p className="muted" style={{ fontSize: 14, marginTop: 0 }}>{t('backup.body')}</p>
+
+          <section className="backup-block">
+            <div className="backup-head">
+              <strong>{t('backup.exportHeading')}</strong>
+              <span className="hint">
+                {lastBackup
+                  ? t('backup.lastExport', { when: fmt.dateTime(lastBackup) })
+                  : t('backup.neverExported')}
+              </span>
+            </div>
+
+            <div className="pill-row" style={{ margin: '10px 0 12px' }}>
+              {counts === null ? (
+                <span className="hint">{t('common.loading')}</span>
+              ) : totalRows === 0 ? (
+                <span className="hint">{t('backup.empty')}</span>
+              ) : (
+                BACKUP_TABLES.filter((k) => (counts[k] ?? 0) > 0).map((k) => (
+                  <span key={k} className="badge">
+                    {resources[k.toLowerCase()].icon} {fmt.int(counts[k])} {tableLabel(k)}
+                  </span>
+                ))
+              )}
+            </div>
+
+            <button className="btn primary" onClick={exportJson} disabled={busy || totalRows === 0}>
+              {t('backup.export')}
+            </button>
+          </section>
+
+          <section className="backup-block">
+            <strong>{t('backup.restoreHeading')}</strong>
+            <p className="hint" style={{ margin: '2px 0 10px' }}>{t('backup.restoreHint')}</p>
+
+            <button
+              type="button"
+              className={`dropzone${dragging ? ' over' : ''}`}
+              onClick={() => jsonRef.current?.click()}
+              onDragEnter={allowDrop}
+              onDragOver={allowDrop}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              disabled={busy}
+            >
+              <span className="dropzone-icon">{dragging ? '📂' : '📄'}</span>
+              <span className="dropzone-main">{t('backup.drop')}</span>
+              <span className="hint">{t('backup.dropHint')}</span>
+            </button>
+            <input
+              ref={jsonRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={onJsonInput}
+              hidden
+            />
+          </section>
         </div>
 
         <div className="card">
-          <h3 className="chart-title">{t('import.json.title')}</h3>
-          <p className="muted" style={{ fontSize: 14 }}>{t('import.json.body')}</p>
-          <div className="pill-row" style={{ marginBottom: 12 }}>
-            <button className="btn" onClick={exportJson} disabled={busy}>{t('import.json.export')}</button>
-          </div>
-          <label className="muted" style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
-            {t('import.json.restore')}
-          </label>
-          <input ref={jsonRef} type="file" accept=".json,application/json" onChange={onJson} disabled={busy} />
+          <h3 className="chart-title">{t('statement.title')}</h3>
+          <p className="muted" style={{ fontSize: 14 }}>{t('statement.body')}</p>
+          <p className="hint" style={{ marginBottom: 8 }}>{t('statement.nameHint')}</p>
+          <input ref={stmtRef} type="file" accept=".xls,.xlsx" onChange={onStatement} disabled={busy} />
         </div>
 
         <div className="card">
@@ -163,6 +232,37 @@ export default function ImportExport() {
           <button className="btn danger" onClick={resetAll} disabled={busy}>{t('import.danger.button')}</button>
         </div>
       </div>
+
+      {pending && counts && (
+        <BackupRestore
+          fileName={pending.fileName}
+          backup={pending.backup}
+          current={counts}
+          onCancel={() => setPending(null)}
+          onDone={(inserted) => {
+            setPending(null)
+            const parts = Object.entries(inserted).map(([k, v]) => `${fmt.int(v)} ${tableLabel(k)}`)
+            setOk(t('backup.restored', { parts: parts.join(', ') }))
+            void loadCounts()
+          }}
+        />
+      )}
+
+      {preview && (
+        <StatementReview
+          preview={preview}
+          onCancel={() => setPreview(null)}
+          onDone={(r) => {
+            setPreview(null)
+            setOk(t('statement.committed', {
+              incomes: r.incomes,
+              expenses: r.expenses,
+              rules: r.aliasesLearned,
+            }))
+            void loadCounts()
+          }}
+        />
+      )}
     </div>
   )
 }

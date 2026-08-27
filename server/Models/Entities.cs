@@ -66,6 +66,31 @@ public class Investment : BaseEntity
     public decimal Amount { get; set; }
 }
 
+/// <summary>Where a classified statement line ends up.</summary>
+public enum LineKind
+{
+    Expense,
+    Income,
+    /// <summary>Internal movement (card payment, transfer between own accounts) that would double-count.</summary>
+    Ignore,
+}
+
+/// <summary>
+/// A learned mapping from a bank statement description to the item/category the user
+/// actually files it under. Grows every time a line is corrected during review, so the
+/// same merchant is recognised automatically next month.
+/// </summary>
+public class ClassificationAlias : BaseEntity
+{
+    /// <summary>Normalised fragment matched against the statement description (lowercase, no accents, no spaces).</summary>
+    public string Pattern { get; set; } = "";
+    public LineKind Kind { get; set; }
+    public string Item { get; set; } = "";
+    public string Category { get; set; } = "";
+    /// <summary>How many times this alias has been applied — used to prefer the more established mapping.</summary>
+    public int Hits { get; set; }
+}
+
 /// <summary>A bank account reference (sheet: "Contas Bancárias").</summary>
 public class BankAccount : BaseEntity
 {

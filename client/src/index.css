@@ -465,3 +465,43 @@ td.num .cell-input { text-align: right; }
   .modal-backdrop { padding: 0; }
   .modal { width: 100%; height: 100%; max-height: none; border-radius: 0; }
 }
+
+/* ---- Statement review ---- */
+.stmt-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.stmt-review .table-wrap { max-height: 55vh; overflow-y: auto; }
+.stmt-review tr.row-off > td:not(:first-child) { opacity: 0.4; }
+/* Long merchant strings must not push the editable columns off-screen. */
+.stmt-review td:nth-child(3) { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stmt-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.badge.warn { background: #fef3c7; color: #92400e; }
+
+/* ---- Backup card ---- */
+.backup-block { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--border); }
+.backup-block:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.backup-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.dropzone {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 22px 16px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-muted);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.dropzone:hover:not(:disabled) { border-color: var(--brand); }
+.dropzone.over { border-color: var(--brand); border-style: solid; background: color-mix(in srgb, var(--brand) 8%, var(--panel-muted)); }
+.dropzone:disabled { opacity: .6; cursor: default; }
+.dropzone-icon { font-size: 26px; line-height: 1; pointer-events: none; }
+.dropzone-main { font-weight: 600; pointer-events: none; }
+.dropzone .hint { pointer-events: none; }
+
+.delta { margin-left: 6px; font-size: 12px; font-weight: 600; }
+.delta.up { color: var(--ok, #16a34a); }
+.delta.down { color: var(--danger, #dc2626); }

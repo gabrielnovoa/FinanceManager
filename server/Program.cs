@@ -9,6 +9,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<DebtCalculator>();
+builder.Services.AddSingleton<StatementParser>();
+builder.Services.AddSingleton<StatementClassifier>();
 
 // --- Database: SQLite locally (zero-config), Azure SQL in the cloud (flip DatabaseProvider) ---
 var provider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
@@ -41,7 +43,15 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // EnsureCreated only builds the schema on a brand-new database, so tables added
+    // later need to be created explicitly for databases that already exist.
+    await SchemaGuard.EnsureAsync(db, app.Logger);
+
     SeedData.Initialize(db, app.Environment.ContentRootPath);
+
+    // Starting rules for statement classification, added only on an empty table.
+    await AliasSeeder.SeedAsync(db, app.Logger);
 
     // Bring the calculated debt columns in line with the formulas. Rows that
     // already agree are left untouched, so this is safe to run on every start
