@@ -73,7 +73,14 @@ public class StatementParser
 
         var descCol = columns["descricao"];
         var amountCol = columns["montante"];
+
+        // Prefer the posting date — the day the purchase happened. The card statements
+        // head that column "Data de lançamento" while the account statement drops the
+        // "de", so both spellings have to be recognised. Falling through to the value
+        // date would push purchases made in the last days of a month into the next one,
+        // because the bank settles them a day or three later.
         var dateCol = columns.TryGetValue("datalancamento", out var dl) ? dl
+                    : columns.TryGetValue("datadelancamento", out var ddl) ? ddl
                     : columns.TryGetValue("datavalor", out var dv) ? dv
                     : 1;
 
