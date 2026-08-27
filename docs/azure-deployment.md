@@ -228,19 +228,23 @@ from (a), and two credentials in (c). An empty `[]` from (c) is the usual
 symptom of the Bash-quoting failure described above — the role assignment can be
 perfectly fine while the credentials silently never got created.
 
-## 4. Add the repository variables
+## 4. Add the repository secrets
 
-These three identifiers are not credentials, so they go in **Variables**, not
-Secrets — Settings → Secrets and variables → Actions → **Variables** tab:
+These three identifiers are not credentials — OIDC still requires a federated
+credential bound to this exact repo and environment — but they go in **Secrets**
+so GitHub masks them in the run logs. The `azure/login` action echoes its inputs,
+and this repository is public. Settings → Secrets and variables → Actions →
+**Secrets** tab:
 
 ```bash
-gh variable set AZURE_CLIENT_ID       --repo gabrielnovoa/FinanceManager --body "$APP_ID"
-gh variable set AZURE_TENANT_ID       --repo gabrielnovoa/FinanceManager --body "<TENANT_ID>"
-gh variable set AZURE_SUBSCRIPTION_ID --repo gabrielnovoa/FinanceManager --body "<SUBSCRIPTION_ID>"
+gh secret set AZURE_CLIENT_ID       --repo gabrielnovoa/FinanceManager --body "$APP_ID"
+gh secret set AZURE_TENANT_ID       --repo gabrielnovoa/FinanceManager --body "<TENANT_ID>"
+gh secret set AZURE_SUBSCRIPTION_ID --repo gabrielnovoa/FinanceManager --body "<SUBSCRIPTION_ID>"
 ```
 
-If you put them under Secrets instead, the workflow fails at the Azure login step
-with an empty client id.
+Make sure the workflow reads them as `${{ secrets.AZURE_* }}`. If it still says
+`${{ vars.AZURE_* }}` while the values live under Secrets, the Azure login step
+fails with an empty client id.
 
 You also need a GitHub environment named `production` (Settings → Environments →
 New environment). The workflow references it, and the OIDC subject depends on it.

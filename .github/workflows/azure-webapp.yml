@@ -1,10 +1,14 @@
 name: Build and deploy to Azure
 
-# Deploys via OIDC federated credentials - no secrets are stored in this repo.
-# Required repository variables (Settings > Secrets and variables > Actions > Variables):
+# Deploys via OIDC federated credentials - no long-lived credentials anywhere.
+# Required repository secrets (Settings > Secrets and variables > Actions > Secrets):
 #   AZURE_CLIENT_ID        application (client) ID of the Entra app registration
 #   AZURE_TENANT_ID        directory (tenant) ID
 #   AZURE_SUBSCRIPTION_ID  target subscription ID
+#
+# These are identifiers rather than credentials, but they are stored as secrets so
+# GitHub masks them in the run logs - azure/login echoes its inputs, and this
+# repository is public.
 # See docs/azure-deployment.md for the one-time Azure setup.
 
 on:
@@ -62,9 +66,9 @@ jobs:
       - name: Sign in to Azure (OIDC)
         uses: azure/login@v3
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
