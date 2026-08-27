@@ -21,6 +21,12 @@ public abstract class CrudControllerBase<T> : ControllerBase where T : BaseEntit
     /// <summary>Base query used by GetAll — override to control ordering.</summary>
     protected virtual IQueryable<T> Query() => Set;
 
+    /// <summary>
+    /// Last chance to adjust an entity before it is written. Override to derive
+    /// calculated columns so they cannot be set from the client.
+    /// </summary>
+    protected virtual void OnSaving(T entity) { }
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<T>>> GetAll()
         => await Query().ToListAsync();
@@ -36,6 +42,7 @@ public abstract class CrudControllerBase<T> : ControllerBase where T : BaseEntit
     public async Task<ActionResult<T>> Create(T entity)
     {
         entity.Id = 0; // never trust a client-supplied id
+        OnSaving(entity);
         Set.Add(entity);
         await Db.SaveChangesAsync();
         return Created($"/api/{ControllerContext.ActionDescriptor.ControllerName}/{entity.Id}", entity);
@@ -47,6 +54,7 @@ public abstract class CrudControllerBase<T> : ControllerBase where T : BaseEntit
         if (id != entity.Id) return BadRequest("Route id and body id do not match.");
         if (!await Set.AnyAsync(e => e.Id == id)) return NotFound();
 
+        OnSaving(entity);
         Db.Entry(entity).State = EntityState.Modified;
         await Db.SaveChangesAsync();
         return NoContent();

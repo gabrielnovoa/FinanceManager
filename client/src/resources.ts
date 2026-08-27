@@ -11,6 +11,8 @@ export interface Field {
   labelKey: TranslationKey
   type: FieldType
   required?: boolean
+  /** Derived on the server from other columns — shown, but never editable. */
+  computed?: boolean
 }
 
 export interface Resource {
@@ -24,7 +26,28 @@ export interface Resource {
   totalField?: string
   /** Date column to group rows by month/year. Omit to disable grouping. */
   groupBy?: string
+  /** Enables the "repeat last month" bulk add. Omit for one-off tables. */
+  replicate?: Replicate
   defaults: () => Record<string, unknown>
+}
+
+/**
+ * Some tables are filled in with the same handful of rows every month — the
+ * account balances on the 1st, the standing transfers mid-month. Rather than
+ * retyping them, we copy last month's rows forward and let the user adjust.
+ */
+export interface Replicate {
+  /** Date column the monthly grouping is based on. */
+  dateField: string
+  /** Columns that identify a recurring row; copied across unchanged. */
+  keyFields: string[]
+  /** Editable numeric columns carried over — each gets its own column and total. */
+  valueFields: string[]
+  /**
+   * 'firstOfMonth' pins every copied row to day 1 (net worth snapshots);
+   * 'sameDay'      keeps the day each row had last month (standing transfers).
+   */
+  dayMode: 'firstOfMonth' | 'sameDay'
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -93,10 +116,17 @@ export const resources: Record<string, Resource> = {
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
       { key: 'installment', labelKey: 'field.installment', type: 'money' },
       { key: 'outstanding', labelKey: 'field.outstanding', type: 'money', required: true },
-      { key: 'termMonths', labelKey: 'field.termMonths', type: 'int' },
-      { key: 'interest', labelKey: 'field.interest', type: 'money' },
+      { key: 'termMonths', labelKey: 'field.termMonths', type: 'int', computed: true },
+      { key: 'interest', labelKey: 'field.interest', type: 'money', computed: true },
     ],
-    defaults: () => ({ date: today(), item: '', installment: 0, outstanding: 0, termMonths: 0, interest: 0 }),
+    defaults: () => ({ date: today(), item: '', installment: 0, outstanding: 0 }),
+    replicate: {
+      dateField: 'date',
+      keyFields: ['item'],
+      // Prazo/Juros are derived server-side, so only these two are carried over.
+      valueFields: ['installment', 'outstanding'],
+      dayMode: 'firstOfMonth', // debt snapshots are taken on the 1st
+    },
   },
   networth: {
     key: 'networth',
@@ -113,6 +143,12 @@ export const resources: Record<string, Resource> = {
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
       { key: 'value', labelKey: 'field.value', type: 'money', required: true },
     ],
+    replicate: {
+      dateField: 'date',
+      keyFields: ['liquidity', 'assetClass', 'item'],
+      valueFields: ['value'],
+      dayMode: 'firstOfMonth', // balances are always taken on the 1st
+    },
     defaults: () => ({ date: today(), liquidity: 'Alta', assetClass: '', item: '', value: 0 }),
   },
   investments: {
@@ -129,6 +165,12 @@ export const resources: Record<string, Resource> = {
       { key: 'destination', labelKey: 'field.destination', type: 'text', required: true },
       { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
     ],
+    replicate: {
+      dateField: 'date',
+      keyFields: ['origin', 'destination'],
+      valueFields: ['amount'],
+      dayMode: 'sameDay', // standing transfers land on the same day each month
+    },
     defaults: () => ({ date: today(), origin: '', destination: '', amount: 0 }),
   },
   accounts: {

@@ -6,6 +6,7 @@ using ClosedXML.Excel;
 using FinanceManager.Api.Data;
 using FinanceManager.Api.Dtos;
 using FinanceManager.Api.Models;
+using FinanceManager.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,7 @@ namespace FinanceManager.Api.Controllers;
 
 [ApiController]
 [Route("api")]
-public class ImportController(AppDbContext db, IWebHostEnvironment env) : ControllerBase
+public class ImportController(AppDbContext db, IWebHostEnvironment env, DebtCalculator calculator) : ControllerBase
 {
     /// <summary>
     /// Import an unlocked Finance.xlsx. Each recognised sheet replaces the matching
@@ -264,9 +265,16 @@ public class ImportController(AppDbContext db, IWebHostEnvironment env) : Contro
             .Select(r => new FixedCost { Type = S(r.Cell(1)), Category = S(r.Cell(2)), Item = S(r.Cell(3)), MonthlyAmount = Dec(r.Cell(4)), AnnualAmount = Dec(r.Cell(5)) })
             .ToList();
 
-    private static List<Debt> ReadDebts(IXLWorksheet ws) =>
+    // Prazo/Juros are formulas: recompute them rather than trusting the columns
+    // in the workbook, which may be stale or blank.
+    private List<Debt> ReadDebts(IXLWorksheet ws) =>
         DataRows(ws).Where(r => !string.IsNullOrWhiteSpace(S(r.Cell(2))))
-            .Select(r => new Debt { Date = Date(r.Cell(1)) ?? default, Item = S(r.Cell(2)), Installment = Dec(r.Cell(3)), Outstanding = Dec(r.Cell(4)), TermMonths = Int(r.Cell(5)), Interest = Dec(r.Cell(6)) })
+            .Select(r =>
+            {
+                var debt = new Debt { Date = Date(r.Cell(1)) ?? default, Item = S(r.Cell(2)), Installment = Dec(r.Cell(3)), Outstanding = Dec(r.Cell(4)) };
+                calculator.Apply(debt);
+                return debt;
+            })
             .ToList();
 
     private static List<NetWorthEntry> ReadNetWorth(IXLWorksheet ws) =>
@@ -300,14 +308,6 @@ public class ImportController(AppDbContext db, IWebHostEnvironment env) : Contro
         if (c.IsEmpty()) return 0m;
         if (c.TryGetValue<decimal>(out var v)) return v;
         return decimal.TryParse(c.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var p) ? p : 0m;
-    }
-
-    private static int? Int(IXLCell c)
-    {
-        if (c.IsEmpty()) return null;
-        if (c.TryGetValue<int>(out var v)) return v;
-        if (c.TryGetValue<double>(out var d)) return (int)Math.Round(d);
-        return int.TryParse(c.GetString(), out var p) ? p : null;
     }
 
     private static DateOnly? Date(IXLCell c)

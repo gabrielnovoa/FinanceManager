@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useI18n } from '../i18n'
 import type { Field, Resource } from '../resources'
 import DataTable, { inputType, isNumeric, type Row } from './DataTable'
+import ReplicateMonthDialog from './ReplicateMonthDialog'
 
 export default function ResourcePage({ resource }: { resource: Resource }) {
   const { t } = useI18n()
@@ -11,10 +12,12 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>(resource.defaults())
   const [saving, setSaving] = useState(false)
+  const [replicating, setReplicating] = useState(false)
 
   // Reset state whenever we switch to a different resource.
   useEffect(() => {
     setForm(resource.defaults())
+    setReplicating(false)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resource.key])
@@ -63,11 +66,23 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
     const body = { ...coerce(values, resource.fields), id }
     try {
       await api.put(`${resource.endpoint}/${id}`, body)
-      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...body } : r)))
+      // Calculated columns are derived server-side, so an optimistic merge would
+      // leave them stale — refetch instead when the resource has any.
+      if (resource.fields.some((f) => f.computed)) await load()
+      else setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...body } : r)))
     } catch (err) {
       setError((err as Error).message)
       throw err
     }
+  }
+
+  // Bulk add from the "repeat last month" dialog. Posted one at a time so a
+  // failure part-way through still leaves the rows that did succeed.
+  async function addMany(newRows: Record<string, unknown>[]) {
+    for (const r of newRows) {
+      await api.post(resource.endpoint, coerce({ ...resource.defaults(), ...r }, resource.fields))
+    }
+    await load()
   }
 
   return (
@@ -80,7 +95,7 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
       {/* Add form */}
       <form className="card" onSubmit={add} style={{ marginBottom: 20 }}>
         <div className="form-row">
-          {resource.fields.map((f) => (
+          {resource.fields.filter((f) => !f.computed).map((f) => (
             <div className="field" key={f.key}>
               <label>{t(f.labelKey)}{f.required && ' *'}</label>
               <input
@@ -97,8 +112,31 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
               {saving ? t('common.saving') : t('common.add')}
             </button>
           </div>
+          {resource.replicate && (
+            <div className="field">
+              <button
+                className="btn"
+                type="button"
+                disabled={saving || loading}
+                title={t('replicate.buttonHint')}
+                onClick={() => setReplicating(true)}
+              >
+                🔁 {t('replicate.button')}
+              </button>
+            </div>
+          )}
         </div>
       </form>
+
+      {replicating && resource.replicate && (
+        <ReplicateMonthDialog
+          resource={resource}
+          replicate={resource.replicate}
+          rows={rows}
+          onClose={() => setReplicating(false)}
+          onSubmit={addMany}
+        />
+      )}
 
       {/* Sorting, filtering and grouping state is per-resource, so remount on switch. */}
       <DataTable
@@ -121,6 +159,7 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
 function coerce(form: Record<string, unknown>, fields: Field[]) {
   const out: Record<string, unknown> = {}
   for (const f of fields) {
+    if (f.computed) continue // the server derives these; sending them would be ignored anyway
     const v = form[f.key]
     if (f.type === 'money' || f.type === 'number') out[f.key] = Number(v || 0)
     else if (f.type === 'int') out[f.key] = v === '' || v === null ? null : Math.round(Number(v))

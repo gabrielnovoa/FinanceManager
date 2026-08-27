@@ -1,4 +1,6 @@
 using FinanceManager.Api.Data;
+using FinanceManager.Api.Models;
+using FinanceManager.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSingleton<DebtCalculator>();
 
 // --- Database: SQLite locally (zero-config), Azure SQL in the cloud (flip DatabaseProvider) ---
 var provider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
@@ -39,6 +42,18 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
     SeedData.Initialize(db, app.Environment.ContentRootPath);
+
+    // Bring the calculated debt columns in line with the formulas. Rows that
+    // already agree are left untouched, so this is safe to run on every start
+    // and self-heals rows written before the formulas existed.
+    var calculator = scope.ServiceProvider.GetRequiredService<DebtCalculator>();
+    var debts = await db.Set<Debt>().ToListAsync();
+    var changed = debts.Count(calculator.Apply);
+    if (changed > 0)
+    {
+        await db.SaveChangesAsync();
+        app.Logger.LogInformation("Recalculated Prazo/Juros on {Count} debt row(s).", changed);
+    }
 }
 
 if (app.Environment.IsDevelopment())

@@ -369,7 +369,7 @@ function DataRow({
     <tr className={editing ? 'editing' : undefined}>
       {fields.map((f, i) => (
         <td key={f.key} className={isNumeric(f.type) ? 'num' : ''}>
-          {editing ? (
+          {editing && !f.computed ? (
             <input
               className={`cell-input${invalid.includes(f.key) ? ' invalid' : ''}`}
               type={inputType(f.type)}
@@ -382,6 +382,12 @@ function DataRow({
               onChange={(e) => onDraftChange(f.key, e.target.value)}
               onKeyDown={onKeyDown}
             />
+          ) : editing ? (
+            // Calculated column: show the stored value, greyed out. It refreshes
+            // from the server once the row is saved.
+            <span className="cell-computed" title={t('table.computedField')}>
+              {cell(row[f.key], f, fmt)}
+            </span>
           ) : (
             cell(row[f.key], f, fmt)
           )}

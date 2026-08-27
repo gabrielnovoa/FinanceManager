@@ -1,5 +1,6 @@
 using FinanceManager.Api.Data;
 using FinanceManager.Api.Models;
+using FinanceManager.Api.Services;
 
 namespace FinanceManager.Api.Controllers;
 
@@ -21,9 +22,12 @@ public class FixedCostsController(AppDbContext db) : CrudControllerBase<FixedCos
     protected override IQueryable<FixedCost> Query() => Set.OrderBy(e => e.Category).ThenBy(e => e.Item);
 }
 
-public class DebtsController(AppDbContext db) : CrudControllerBase<Debt>(db)
+public class DebtsController(AppDbContext db, DebtCalculator calculator) : CrudControllerBase<Debt>(db)
 {
     protected override IQueryable<Debt> Query() => Set.OrderByDescending(e => e.Date).ThenBy(e => e.Item);
+
+    // Prazo and Juros are spreadsheet formulas, not user input — always recompute.
+    protected override void OnSaving(Debt entity) => calculator.Apply(entity);
 }
 
 public class NetWorthController(AppDbContext db) : CrudControllerBase<NetWorthEntry>(db)

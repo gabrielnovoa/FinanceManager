@@ -336,6 +336,15 @@ tbody tr.editing:hover { background: #f8fafc; }
 .cell-input:disabled { opacity: .6; }
 td.num .cell-input { text-align: right; }
 
+/* Calculated column while its row is being edited: readable, clearly not input. */
+.cell-computed {
+  display: inline-block;
+  padding: 5px 8px;
+  color: var(--text-soft);
+  font-style: italic;
+  cursor: help;
+}
+
 /* ---- Sortable / filterable / groupable table ---- */
 .btn.subtle { padding: 6px 10px; font-size: 13px; color: var(--text-soft); }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
@@ -420,8 +429,39 @@ td.num .cell-input { text-align: right; }
 .alert { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
 .alert.ok { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .alert.err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.alert.warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.hint { font-size: 12px; color: var(--text-soft); }
 .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .muted { color: var(--text-soft); }
 .count { font-size: 13px; color: var(--text-soft); }
 .chart-tip { background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; box-shadow: var(--shadow); }
 .chart-tip .k { color: var(--text-soft); }
+
+/* ---- Modal ---- */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: #fff; border-radius: var(--radius); box-shadow: var(--shadow);
+  width: min(760px, 100%); max-height: calc(100vh - 40px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; font-size: 17px; }
+.modal-body { padding: 20px; overflow-y: auto; }
+.modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 14px 20px; border-top: 1px solid var(--border); background: var(--panel-muted);
+}
+.modal .table-wrap { max-height: 46vh; overflow-y: auto; }
+.modal tr.row-off > td:not(:first-child) { opacity: 0.4; }
+@media (max-width: 720px) {
+  .modal-backdrop { padding: 0; }
+  .modal { width: 100%; height: 100%; max-height: none; border-radius: 0; }
+}
