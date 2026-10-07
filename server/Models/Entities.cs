@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FinanceManager.Api.Models;
 
 /// <summary>Common identity for every stored record.</summary>
@@ -26,12 +28,28 @@ public class Income : BaseEntity
     public string Source { get; set; } = "";
 }
 
-/// <summary>A recurring fixed or variable monthly cost (sheet: "Gastos Fixos").</summary>
+/// <summary>How often a fixed cost is actually charged.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum CostFrequency
+{
+    /// <summary>Charged every month; the annual figure is derived (× 12).</summary>
+    Monthly,
+    /// <summary>Charged once or a few times a year; the monthly figure is derived (÷ 12).</summary>
+    Annual,
+}
+
+/// <summary>A recurring fixed or variable cost (sheet: "Gastos Fixos").</summary>
 public class FixedCost : BaseEntity
 {
     public string Type { get; set; } = "";      // "Conta Fixa" | "Conta Variável"
     public string Category { get; set; } = "";
     public string Item { get; set; } = "";
+    public CostFrequency Frequency { get; set; } = CostFrequency.Monthly;
+    /// <summary>
+    /// Months (1–12) an annual cost is charged in; the annual amount is split evenly
+    /// across them (e.g. IMI in May, August and November). Always empty for monthly costs.
+    /// </summary>
+    public int[] DueMonths { get; set; } = [];
     public decimal MonthlyAmount { get; set; }
     public decimal AnnualAmount { get; set; }
 }

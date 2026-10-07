@@ -1,80 +1,43 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api'
+import { coerce } from '../fieldValues'
 import { useI18n } from '../i18n'
-import type { Field, Resource } from '../resources'
-import DataTable, { inputType, isNumeric, type Row } from './DataTable'
+import type { Resource } from '../resources'
+import DataTable from './DataTable'
+import FieldInput from './FieldInput'
 import ReplicateMonthDialog from './ReplicateMonthDialog'
+import { useResourceData } from './useResourceData'
 
 export default function ResourcePage({ resource }: { resource: Resource }) {
   const { t } = useI18n()
-  const [rows, setRows] = useState<Row[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { rows, loading, error, load, create, remove, save } = useResourceData(resource)
   const [form, setForm] = useState<Record<string, unknown>>(resource.defaults())
   const [saving, setSaving] = useState(false)
   const [replicating, setReplicating] = useState(false)
 
-  // Reset state whenever we switch to a different resource.
+  // Reset the form whenever we switch to a different resource.
   useEffect(() => {
     setForm(resource.defaults())
     setReplicating(false)
-    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resource.key])
-
-  async function load() {
-    setLoading(true)
-    setError(null)
-    try {
-      setRows(await api.get<Row[]>(resource.endpoint))
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function add(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
-    setError(null)
     try {
-      await api.post(resource.endpoint, coerce(form, resource.fields))
+      await create(coerce(form, resource.fields))
       setForm(resource.defaults())
       await load()
-    } catch (err) {
-      setError((err as Error).message)
+    } catch {
+      // The hook has already surfaced the error; keep the form as typed.
     } finally {
       setSaving(false)
     }
   }
 
-  async function remove(id: number) {
-    if (!confirm(t('common.confirmDelete'))) return
-    try {
-      await api.del(`${resource.endpoint}/${id}`)
-      setRows((r) => r.filter((x) => x.id !== id))
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
-
-  // The API replaces the whole row, so the body carries every field plus the
-  // id. Rethrowing lets the table keep the row open when a save fails.
-  async function update(id: number, values: Record<string, unknown>) {
-    setError(null)
-    const body = { ...coerce(values, resource.fields), id }
-    try {
-      await api.put(`${resource.endpoint}/${id}`, body)
-      // Calculated columns are derived server-side, so an optimistic merge would
-      // leave them stale — refetch instead when the resource has any.
-      if (resource.fields.some((f) => f.computed)) await load()
-      else setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...body } : r)))
-    } catch (err) {
-      setError((err as Error).message)
-      throw err
-    }
-  }
+  // The API replaces the whole row, so the body carries every editable field.
+  const update = (id: number, values: Record<string, unknown>) => save(id, coerce(values, resource.fields))
 
   // Bulk add from the "repeat last month" dialog. Posted one at a time so a
   // failure part-way through still leaves the rows that did succeed.
@@ -98,12 +61,11 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
           {resource.fields.filter((f) => !f.computed).map((f) => (
             <div className="field" key={f.key}>
               <label>{t(f.labelKey)}{f.required && ' *'}</label>
-              <input
-                type={inputType(f.type)}
-                step={isNumeric(f.type) ? 'any' : undefined}
+              <FieldInput
+                field={f}
                 required={f.required}
                 value={String(form[f.key] ?? '')}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                onChange={(value) => setForm({ ...form, [f.key]: value })}
               />
             </div>
           ))}
@@ -152,18 +114,4 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
       />
     </div>
   )
-}
-
-// ---- helpers ----
-
-function coerce(form: Record<string, unknown>, fields: Field[]) {
-  const out: Record<string, unknown> = {}
-  for (const f of fields) {
-    if (f.computed) continue // the server derives these; sending them would be ignored anyway
-    const v = form[f.key]
-    if (f.type === 'money' || f.type === 'number') out[f.key] = Number(v || 0)
-    else if (f.type === 'int') out[f.key] = v === '' || v === null ? null : Math.round(Number(v))
-    else out[f.key] = v ?? ''
-  }
-  return out
 }

@@ -1,5 +1,6 @@
 using FinanceManager.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace FinanceManager.Api.Data;
 
@@ -25,6 +26,22 @@ public class AppDbContext : DbContext
             e.Property(x => x.Category).HasMaxLength(200);
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.Pattern).IsUnique();
+        });
+
+        modelBuilder.Entity<FixedCost>(e =>
+        {
+            e.Property(x => x.Frequency).HasConversion<string>().HasMaxLength(20);
+            // Stored as "5,8,11" so it stays a plain column on both SQLite and SQL Server.
+            e.Property(x => x.DueMonths)
+                .HasConversion(
+                    v => string.Join(',', v),
+                    v => v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                          .Select(int.Parse).ToArray(),
+                    new ValueComparer<int[]>(
+                        (a, b) => a!.SequenceEqual(b!),
+                        v => v.Aggregate(0, (h, x) => HashCode.Combine(h, x)),
+                        v => v.ToArray()))
+                .HasMaxLength(40);
         });
     }
 

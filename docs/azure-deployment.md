@@ -20,6 +20,7 @@ the API and deploys to Azure automatically.
 | Database auth | System-assigned managed identity (no password anywhere) |
 | Deploy auth | OIDC federated credentials (no secrets in the repo) |
 | App access | Easy Auth — `owner@example.com`, `seconduser@example.com` |
+| AI assistant | `aoai-finance-tn` — Azure OpenAI S0, deployment `gpt-5-mini` (GlobalStandard), managed identity |
 
 Availability in Spain Central was verified for all three SKUs: B1 Linux App
 Service, Basic DTU SQL, and the region itself. `Microsoft.Web` and
@@ -417,6 +418,68 @@ az consumption budget create \
 
 Or portal → Subscriptions → Personal → **Budgets**, with alerts at 50% and 90%.
 
+## 8. Set up the AI assistant
+
+The **Assistant** page sends questions to an Azure OpenAI model, which answers by
+running read-only SQL against `financedb` and, when it needs outside facts, by
+searching the web. It authenticates with the web app's managed identity, so there
+is no key anywhere — key auth is disabled on the resource.
+
+On startup the app creates `ai_reader`, a database user with no login and only
+`db_datareader`; every assistant query runs impersonating it on a separate,
+unpooled connection, so the model cannot change data even with a malformed query.
+
+```powershell
+$RG  = "rg-finance-tn"
+$AI  = "aoai-finance-tn"
+
+# The subscription needs the provider once
+az provider register -n Microsoft.CognitiveServices --wait
+
+az cognitiveservices account create -n $AI -g $RG -l spaincentral `
+  --kind OpenAI --sku S0 --custom-domain $AI --yes
+
+# Visual Studio subscriptions only get quota for a few models; check before deploying:
+#   az cognitiveservices usage list -l spaincentral -o json   (look for a non-zero limit)
+az cognitiveservices account deployment create -g $RG -n $AI `
+  --deployment-name gpt-5-mini --model-name gpt-5-mini --model-version 2025-08-07 `
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 50
+
+# Entra ID only - no keys
+$id = az cognitiveservices account show -g $RG -n $AI --query id -o tsv
+az resource update --ids $id --set properties.disableLocalAuth=true
+
+# Let the web app (and you, for local development) call the model
+$mi = az webapp identity show -g $RG -n finance-tn --query principalId -o tsv
+$me = az ad signed-in-user show --query id -o tsv
+az role assignment create --assignee-object-id $mi --assignee-principal-type ServicePrincipal `
+  --role "Cognitive Services OpenAI User" --scope $id
+az role assignment create --assignee-object-id $me --assignee-principal-type User `
+  --role "Cognitive Services OpenAI User" --scope $id
+
+# Point the app at it
+az webapp config appsettings set -g $RG -n finance-tn --settings `
+  "AI__Endpoint=https://$AI.openai.azure.com/" "AI__Deployment=gpt-5-mini"
+```
+
+Billing is pay-per-token; a typical question costs a fraction of a cent.
+`GlobalStandard` means a prompt may be processed in any Azure region, while
+everything stored stays in Spain Central. If DataZone quota becomes available,
+redeploying with `--sku-name DataZoneStandard` keeps processing inside the EU.
+
+Role assignments can take a few minutes to apply. Until then the Assistant
+answers with *"The AI service returned an error (401)"*.
+
+**Web search** uses the Responses API's `web_search` tool, which is backed by
+Grounding with Bing. Search queries leave Azure's compliance and geo boundary
+(the Data Protection Addendum does not cover them) and are billed per search on
+top of tokens. The model is instructed to search only for general facts, never
+with personal data. To switch it off:
+
+```powershell
+az webapp config appsettings set -g rg-finance-tn -n finance-tn --settings AI__WebSearch=false
+```
+
 ## How deploys work
 
 Push to `main`, or run the workflow manually from the Actions tab. The job:
@@ -426,8 +489,10 @@ Concurrent runs on the same branch cancel each other, so a rapid second push
 never races the first.
 
 `EnsureCreated()` builds the schema on the first request after deployment.
-The app has no EF migrations, so changing a model means dropping and recreating
-`financedb` — export your data first.
+The app has no EF migrations: tables and columns added later are created on
+startup by `SchemaGuard` (for example `FixedCosts.Frequency` and
+`FixedCosts.DueMonths`). Any other model change, such as renaming or retyping a
+column, still means dropping and recreating `financedb` — export your data first.
 
 ## Verify the whole setup
 

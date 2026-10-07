@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FinanceManager.Api.Models;
+using FinanceManager.Api.Services;
 
 namespace FinanceManager.Api.Data;
 
@@ -38,7 +39,11 @@ public static class SeedData
 
         if (seed.Expenses is { Count: > 0 }) db.Expenses.AddRange(seed.Expenses);
         if (seed.Income is { Count: > 0 }) db.Incomes.AddRange(seed.Income);
-        if (seed.FixedCosts is { Count: > 0 }) db.FixedCosts.AddRange(seed.FixedCosts);
+        if (seed.FixedCosts is { Count: > 0 })
+        {
+            FixedCostCalculator.Normalize(seed.FixedCosts);
+            db.FixedCosts.AddRange(seed.FixedCosts);
+        }
         if (seed.Debts is { Count: > 0 }) db.Debts.AddRange(seed.Debts);
         if (seed.NetWorth is { Count: > 0 }) db.NetWorthEntries.AddRange(seed.NetWorth);
         if (seed.Investments is { Count: > 0 }) db.Investments.AddRange(seed.Investments);

@@ -1,6 +1,7 @@
 using FinanceManager.Api.Data;
 using FinanceManager.Api.Models;
 using FinanceManager.Api.Services;
+using FinanceManager.Api.Services.Ai;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<DebtCalculator>();
 builder.Services.AddSingleton<StatementParser>();
 builder.Services.AddSingleton<StatementClassifier>();
+
+// AI assistant: off until AI:Endpoint and AI:Deployment are configured.
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.Section));
+builder.Services.AddSingleton<FinanceAssistant>();
 
 // --- Database: SQLite locally (zero-config), Azure SQL in the cloud (flip DatabaseProvider) ---
 var provider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";

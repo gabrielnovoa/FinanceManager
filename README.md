@@ -14,7 +14,9 @@ delete records, explore interactive reports and charts, and deploy it to Azure.
 | Area | Feature |
 |------|---------|
 | **Dashboard** | KPIs (income, expenses, net, savings rate, fixed/month, net worth, total debt), monthly income-vs-expenses chart, expenses by category (donut) and by source, net-worth trend, debt trend, year filter |
-| **Data pages** | Full add/delete for Expenses, Income, Fixed Costs, Debts, Net Worth, Investments, Bank Accounts — each with running totals |
+| **Assistant** | Chat with an AI model about your own data — analyses, period comparisons, what-if simulations. It runs read-only SQL on the database and can search the web for outside facts (rates, inflation, tax rules) |
+| **Data pages** | Full add/edit/delete for Expenses, Income, Fixed Costs, Debts, Net Worth, Investments, Bank Accounts — each with running totals |
+| **Fixed Costs** | Separate monthly and annual tables, plus a calendar of the months each annual cost falls due and how much to set aside per month |
 | **Import / Export** | Import a bank/card statement with automatic classification, back up and restore everything as JSON, or reset |
 
 Every table mirrors a sheet from the original workbook:
@@ -23,7 +25,7 @@ Every table mirrors a sheet from the original workbook:
 |----------|----------------|--------|
 | Expenses | Despesas | Date, Item, Amount, Category, Source |
 | Income | Receitas | Date, Item, Amount, Category, Source |
-| Fixed Costs | Gastos Fixos | Type, Category, Item, Monthly, Annual |
+| Fixed Costs | Gastos Fixos | Type, Category, Item, Frequency, Due months, Monthly, Annual |
 | Debts | Dívidas | Date, Item, Installment, Outstanding, Term, Interest |
 | Net Worth | Patrimônio | Date, Liquidity, Asset Class, Item, Value |
 | Investments | Investimentos | Date, Origin, Destination, Amount |
@@ -72,6 +74,52 @@ npm run dev
 Open **http://localhost:5173**. The dev server proxies `/api` to the .NET app, so
 there's nothing else to configure. A `finance.db` SQLite file is created
 automatically next to the API on first run.
+
+### Fixed costs: monthly vs annual
+
+Each fixed cost has a **frequency**. For a monthly cost you type the monthly
+amount and the annual one is calculated (× 12); for an annual cost you type the
+annual amount, pick the months it is charged in (e.g. IMI in May, August and
+November — the amount is split evenly), and the monthly figure becomes what to
+set aside each month. The calendar on the page shows what falls due when; click a
+cell to mark or clear a month.
+
+When an existing database is upgraded, rows whose annual amount is not exactly
+twelve monthly ones (e.g. IMI 770,00 vs 64,17 × 12) are classified as annual
+automatically. Check the rest and set the due months.
+
+### AI assistant (optional)
+
+The **Assistant** page is off until it is pointed at an Azure OpenAI deployment.
+The model gets the database schema and two tools:
+
+- **Database** — runs **one read-only `SELECT`** on its own connection that the
+  database itself cannot write through (SQLite opened read-only; on Azure SQL the
+  query runs as `ai_reader`, a login-less `db_datareader` user created on
+  startup). A text screen and an always-rolled-back transaction sit on top.
+- **Web search** — Azure OpenAI's built-in `web_search` (Grounding with Bing),
+  for outside facts such as Euribor, inflation or tax rules. The model is told
+  never to put personal data in search queries; answers list their sources.
+  Searches leave Azure's compliance boundary and are billed per search — set
+  `AI__WebSearch=false` to turn it off.
+
+Conversations stay in the browser tab; nothing is stored on the server.
+
+To use it locally, sign in with `az login` (your account needs the
+*Cognitive Services OpenAI User* role on the resource) and set:
+
+```powershell
+$env:AI__Endpoint   = "https://<your-resource>.openai.azure.com/"
+$env:AI__Deployment = "gpt-5-mini"
+# Only if this machine is also signed in to other tenants (e.g. a work account in Visual Studio):
+$env:AI__TenantId   = "<tenant id of the AI resource>"
+cd server; dotnet run
+```
+
+Without `AI__ApiKey` the app authenticates with Microsoft Entra ID — the managed
+identity in Azure, your developer sign-in locally. See
+[docs/azure-deployment.md](docs/azure-deployment.md#8-set-up-the-ai-assistant)
+for creating the resource.
 
 ---
 
@@ -166,11 +214,14 @@ FinanceManager/
 │  ├─ Program.cs               startup, DB provider switch, SPA hosting
 │  ├─ Models/Entities.cs       the 7 data types
 │  ├─ Data/                    DbContext + first-run JSON seeding
-│  ├─ Controllers/             generic CRUD + Dashboard + Import/Export
+│  ├─ Controllers/             generic CRUD + Dashboard + Import/Export + Chat
+│  ├─ Services/Ai/             AI assistant and its read-only SQL tool
 │  └─ finance_seed.json        auto-loaded when the DB is empty
 ├─ client/                     React + Vite + TypeScript SPA
 │  └─ src/
 │     ├─ pages/Dashboard.tsx   charts & KPIs
+│     ├─ pages/FixedCosts.tsx  monthly/annual tables + payment calendar
+│     ├─ pages/Chat.tsx        AI assistant
 │     ├─ pages/ImportExport.tsx
 │     ├─ components/ResourcePage.tsx   reusable add/delete table
 │     └─ resources.ts          declarative table definitions
@@ -186,6 +237,7 @@ FinanceManager/
 |--------|-------|---------|
 | GET/POST/PUT/DELETE | `/api/expenses` (and `income`, `fixedcosts`, `debts`, `networth`, `investments`, `accounts`) | CRUD per table |
 | GET | `/api/dashboard/summary?year=2025` | All KPIs, series and breakdowns |
+| GET | `/api/chat/status` · POST `/api/chat` | Whether the assistant is configured · ask it a question |
 | POST | `/api/statement/preview` · `/api/statement/commit` | Classify a statement, then save the reviewed lines |
 | GET | `/api/backup/summary` | Row count per table |
 | POST | `/api/import/json` · GET `/api/export/json` | Restore / back up |

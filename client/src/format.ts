@@ -16,6 +16,8 @@ export interface Formatters {
   compact: (n: number) => string
   /** "2025-01" -> "Jan 2025" / "jan. 2025" */
   monthLabel: (key: string) => string
+  /** 1 -> "Jan" / "jan." (short) or "January" / "janeiro" (long). */
+  monthName: (month: number, style?: 'short' | 'long') => string
 }
 
 export function createFormatters(locale: string): Formatters {
@@ -33,6 +35,7 @@ export function createFormatters(locale: string): Formatters {
   // Only the month part: pt-PT's combined short month+year pattern is numeric
   // ("01/2025"), which reads far worse on a chart axis than "jan. 2025".
   const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
+  const monthLongFmt = new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' })
   const dateTimeFmt = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' })
 
   return {
@@ -50,5 +53,7 @@ export function createFormatters(locale: string): Formatters {
       if (!y || !m) return key
       return `${monthFmt.format(new Date(Date.UTC(y, m - 1, 1)))} ${y}`
     },
+    monthName: (month, style = 'short') =>
+      (style === 'long' ? monthLongFmt : monthFmt).format(new Date(Date.UTC(2000, month - 1, 1))),
   }
 }

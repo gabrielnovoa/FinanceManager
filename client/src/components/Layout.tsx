@@ -66,6 +66,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span className="ico">🏠</span> {t('nav.dashboard')}
         </NavLink>
 
+        <NavLink to="/chat" className={linkClass} onClick={closeNav}>
+          <span className="ico">🤖</span> {t('nav.assistant')}
+        </NavLink>
+
         {resourceList.map((r) => (
           <NavLink key={r.key} to={`/${r.key}`} className={linkClass} onClick={closeNav}>
             <span className="ico">{r.icon}</span> {t(r.titleKey)}

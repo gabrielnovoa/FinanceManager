@@ -4,7 +4,12 @@
 
 import type { TranslationKey } from './i18n/translations'
 
-export type FieldType = 'text' | 'money' | 'number' | 'int' | 'date'
+export type FieldType = 'text' | 'money' | 'number' | 'int' | 'date' | 'select' | 'months'
+
+export interface FieldOption {
+  value: string
+  labelKey: TranslationKey
+}
 
 export interface Field {
   key: string
@@ -13,6 +18,8 @@ export interface Field {
   required?: boolean
   /** Derived on the server from other columns — shown, but never editable. */
   computed?: boolean
+  /** Choices for a 'select' field. */
+  options?: FieldOption[]
 }
 
 export interface Resource {
@@ -51,6 +58,12 @@ export interface Replicate {
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
+
+/** How often a fixed cost is charged — mirrors the server's CostFrequency enum. */
+export const frequencyOptions: FieldOption[] = [
+  { value: 'Monthly', labelKey: 'freq.monthly' },
+  { value: 'Annual', labelKey: 'freq.annual' },
+]
 
 export const resources: Record<string, Resource> = {
   expenses: {
@@ -94,14 +107,20 @@ export const resources: Record<string, Resource> = {
     subtitleKey: 'res.fixedcosts.subtitle',
     icon: '📌',
     totalField: 'monthlyAmount',
+    // The full row. The page itself (pages/FixedCosts.tsx) splits it into a monthly
+    // and an annual table, each showing only the columns that matter there.
     fields: [
       { key: 'type', labelKey: 'field.type', type: 'text' },
       { key: 'category', labelKey: 'field.category', type: 'text', required: true },
       { key: 'item', labelKey: 'field.item', type: 'text', required: true },
-      { key: 'monthlyAmount', labelKey: 'field.monthlyAmount', type: 'money', required: true },
+      { key: 'frequency', labelKey: 'field.frequency', type: 'select', options: frequencyOptions },
+      { key: 'dueMonths', labelKey: 'field.dueMonths', type: 'months' },
+      { key: 'monthlyAmount', labelKey: 'field.monthlyAmount', type: 'money' },
       { key: 'annualAmount', labelKey: 'field.annualAmount', type: 'money' },
     ],
-    defaults: () => ({ type: 'Conta Fixa', category: '', item: '', monthlyAmount: 0, annualAmount: 0 }),
+    defaults: () => ({
+      type: 'Conta Fixa', category: '', item: '', frequency: 'Monthly', dueMonths: [], monthlyAmount: 0, annualAmount: 0,
+    }),
   },
   debts: {
     key: 'debts',

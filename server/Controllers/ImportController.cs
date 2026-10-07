@@ -30,7 +30,11 @@ public class ImportController(AppDbContext db, IWebHostEnvironment env, DebtCalc
         var jobs = new List<(string Key, Func<Task<int>> Run)>();
         if (backup.Expenses is { } expenses) jobs.Add(("expenses", () => Replace(db.Expenses, expenses)));
         if (backup.Income is { } income) jobs.Add(("income", () => Replace(db.Incomes, income)));
-        if (backup.FixedCosts is { } fixedCosts) jobs.Add(("fixedCosts", () => Replace(db.FixedCosts, fixedCosts)));
+        if (backup.FixedCosts is { } fixedCosts)
+        {
+            FixedCostCalculator.Normalize(fixedCosts);
+            jobs.Add(("fixedCosts", () => Replace(db.FixedCosts, fixedCosts)));
+        }
         if (backup.Debts is { } debts)
         {
             // Backups taken before Prazo/Juros became calculated columns carry blanks,

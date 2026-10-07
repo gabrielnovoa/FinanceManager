@@ -7,11 +7,15 @@
 // there is no need to push sorting and filtering into the API.
 
 import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
+import { inputType, isNumeric, monthsToString, parseMonths } from '../fieldValues'
 import type { Formatters } from '../format'
 import { languages, useI18n } from '../i18n'
 import type { Translate } from '../i18n'
 import type { Field, FieldType } from '../resources'
+import FieldInput from './FieldInput'
 import Icon from './Icon'
+
+export { inputType, isNumeric }
 
 export type Row = Record<string, unknown> & { id: number }
 
@@ -67,10 +71,15 @@ export default function DataTable({
 
   const filtered = useMemo(() => {
     if (activeFilters.length === 0) return rows
+    // Choice and month columns are filtered on what is shown ("Anual", "mai"), not the stored code.
+    const shown = (row: Row, key: string) => {
+      const f = fields.find((x) => x.key === key)
+      return f && (f.type === 'select' || f.type === 'months') ? cell(row[key], f, fmt, t) : row[key]
+    }
     return rows.filter((row) =>
-      activeFilters.every(([key, query]) => matches(row[key], typeOf[key], query)),
+      activeFilters.every(([key, query]) => matches(shown(row, key), typeOf[key], query)),
     )
-  }, [rows, activeFilters, typeOf])
+  }, [rows, activeFilters, typeOf, fields, fmt, t])
 
   const sorted = useMemo(() => {
     if (!sort) return filtered
@@ -370,26 +379,24 @@ function DataRow({
       {fields.map((f, i) => (
         <td key={f.key} className={isNumeric(f.type) ? 'num' : ''}>
           {editing && !f.computed ? (
-            <input
+            <FieldInput
+              field={f}
               className={`cell-input${invalid.includes(f.key) ? ' invalid' : ''}`}
-              type={inputType(f.type)}
-              step={isNumeric(f.type) ? 'any' : undefined}
               value={draft[f.key] ?? ''}
               autoFocus={i === 0}
               disabled={savingRow}
-              aria-label={t(f.labelKey)}
-              aria-invalid={invalid.includes(f.key) || undefined}
-              onChange={(e) => onDraftChange(f.key, e.target.value)}
+              invalid={invalid.includes(f.key)}
+              onChange={(value) => onDraftChange(f.key, value)}
               onKeyDown={onKeyDown}
             />
           ) : editing ? (
             // Calculated column: show the stored value, greyed out. It refreshes
             // from the server once the row is saved.
             <span className="cell-computed" title={t('table.computedField')}>
-              {cell(row[f.key], f, fmt)}
+              {cell(row[f.key], f, fmt, t)}
             </span>
           ) : (
-            cell(row[f.key], f, fmt)
+            cell(row[f.key], f, fmt, t)
           )}
         </td>
       ))}
@@ -445,33 +452,30 @@ function DataRow({
 
 // ---- helpers ----
 
-export function isNumeric(type: FieldType) {
-  return type === 'money' || type === 'number' || type === 'int'
-}
-
-/** Which native input a field type should use, for both the add form and inline edit. */
-export function inputType(type: FieldType) {
-  return type === 'date' ? 'date' : isNumeric(type) ? 'number' : 'text'
-}
-
 /**
  * Stored value -> what the edit input expects: raw numbers rather than the
  * formatted currency shown in read mode, and a bare yyyy-MM-dd for date inputs.
  */
 function editValue(value: unknown, type: FieldType): string {
+  if (type === 'months') return monthsToString(value)
   if (isBlank(value)) return ''
   if (type === 'date') return String(value).slice(0, 10)
   return String(value)
 }
 
-export function cell(value: unknown, f: Field, fmt: Formatters) {
+export function cell(value: unknown, f: Field, fmt: Formatters, t: Translate) {
   if (isBlank(value)) return f.type === 'money' ? fmt.eur(0) : '—'
   if (f.type === 'money') return fmt.eur(Number(value))
+  if (f.type === 'months') return parseMonths(value).map((m) => fmt.monthName(m)).join(', ')
+  if (f.type === 'select') {
+    const option = f.options?.find((o) => o.value === value)
+    return option ? t(option.labelKey) : String(value)
+  }
   return String(value)
 }
 
 function isBlank(v: unknown) {
-  return v === null || v === undefined || v === ''
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
 }
 
 function sum(rows: Row[], key: string) {
@@ -495,6 +499,8 @@ function flip(dir: SortDir): SortDir {
 
 function compareValues(a: unknown, b: unknown, type: FieldType | undefined, locale: string) {
   if (type && isNumeric(type)) return Number(a) - Number(b)
+  // Earliest due month first; blanks are already handled by the caller.
+  if (type === 'months') return (parseMonths(a)[0] ?? 13) - (parseMonths(b)[0] ?? 13)
   // ISO dates sort correctly as plain strings.
   if (type === 'date') return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0
   return String(a).localeCompare(String(b), locale, { numeric: true, sensitivity: 'base' })
