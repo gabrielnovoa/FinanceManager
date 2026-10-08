@@ -496,6 +496,14 @@ startup by `SchemaGuard` (for example `FixedCosts.Frequency` and
 `FixedCosts.DueMonths`). Any other model change, such as renaming or retyping a
 column, still means dropping and recreating `financedb` — export your data first.
 
+Azure SQL occasionally drops connections, for example during a failover or
+while the database is being reconfigured. On startup the app retries preparing the
+database four times over about a minute instead of crashing. At runtime, EF Core's
+SQL Server retry policy (`EnableRetryOnFailure`) re-runs commands that fail
+transiently. Because of that policy, any explicit transaction has to run inside
+`db.Database.CreateExecutionStrategy()`. Otherwise EF throws on purpose rather
+than risk retrying half a transaction.
+
 ## Verify the whole setup
 
 Every command here is read-only. Run them when something misbehaves, or after

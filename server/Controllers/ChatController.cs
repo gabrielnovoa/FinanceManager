@@ -75,10 +75,17 @@ public class ChatController(AppDbContext db, FinanceAssistant assistant, ILogger
             .Select(c => c.Id)
             .ToListAsync(ct);
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.ChatMessages.Where(m => mine.Contains(m.ConversationId)).ExecuteDeleteAsync(ct);
-        var deleted = await db.ChatConversations.Where(c => mine.Contains(c.Id)).ExecuteDeleteAsync(ct);
-        await tx.CommitAsync(ct);
+        // The SQL Server retry policy only allows a transaction inside its execution
+        // strategy, which re-runs the whole unit if the connection drops part-way.
+        var deleted = 0;
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await db.ChatMessages.Where(m => mine.Contains(m.ConversationId)).ExecuteDeleteAsync(ct);
+            deleted = await db.ChatConversations.Where(c => mine.Contains(c.Id)).ExecuteDeleteAsync(ct);
+            await tx.CommitAsync(ct);
+        });
         return new { deleted };
     }
 

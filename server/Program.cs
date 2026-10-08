@@ -1,5 +1,4 @@
 using FinanceManager.Api.Data;
-using FinanceManager.Api.Models;
 using FinanceManager.Api.Services;
 using FinanceManager.Api.Services.Ai;
 using Microsoft.EntityFrameworkCore;
@@ -25,8 +24,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
     {
-        options.UseSqlServer(connectionString
-            ?? throw new InvalidOperationException("DatabaseProvider is SqlServer but ConnectionStrings:DefaultConnection is not set."));
+        // Azure SQL drops connections now and then (failovers, reconfiguration); retry
+        // those instead of failing the request. Any explicit transaction must therefore
+        // run inside db.Database.CreateExecutionStrategy() — see ChatController.Delete.
+        options.UseSqlServer(
+            connectionString
+                ?? throw new InvalidOperationException("DatabaseProvider is SqlServer but ConnectionStrings:DefaultConnection is not set."),
+            sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null));
     }
     else
     {
@@ -43,33 +47,8 @@ builder.Services.AddCors(options => options.AddPolicy(DevCors, policy =>
 
 var app = builder.Build();
 
-// Create the database if needed and load seed data on first run.
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-
-    // EnsureCreated only builds the schema on a brand-new database, so tables added
-    // later need to be created explicitly for databases that already exist.
-    await SchemaGuard.EnsureAsync(db, app.Logger);
-
-    SeedData.Initialize(db, app.Environment.ContentRootPath);
-
-    // Starting rules for statement classification, added only on an empty table.
-    await AliasSeeder.SeedAsync(db, app.Logger);
-
-    // Bring the calculated debt columns in line with the formulas. Rows that
-    // already agree are left untouched, so this is safe to run on every start
-    // and self-heals rows written before the formulas existed.
-    var calculator = scope.ServiceProvider.GetRequiredService<DebtCalculator>();
-    var debts = await db.Set<Debt>().ToListAsync();
-    var changed = debts.Count(calculator.Apply);
-    if (changed > 0)
-    {
-        await db.SaveChangesAsync();
-        app.Logger.LogInformation("Recalculated Prazo/Juros on {Count} debt row(s).", changed);
-    }
-}
+// Create the database if needed, upgrade its schema and load seed data on first run.
+await DatabaseInitializer.RunAsync(app.Services, app.Environment.ContentRootPath, app.Logger);
 
 if (app.Environment.IsDevelopment())
 {
