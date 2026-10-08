@@ -116,3 +116,26 @@ public class BankAccount : BaseEntity
     public string Iban { get; set; } = "";
     public string Swift { get; set; } = "";
 }
+
+/// <summary>One conversation with the AI assistant. Private to the user who started it.</summary>
+public class ChatConversation : BaseEntity
+{
+    /// <summary>Easy Auth principal id of the user, or "local" when running without sign-in.</summary>
+    public string Owner { get; set; } = "";
+    public string Title { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public List<ChatMessageEntry> Messages { get; set; } = [];
+}
+
+/// <summary>A single question or answer within a <see cref="ChatConversation"/>.</summary>
+public class ChatMessageEntry : BaseEntity
+{
+    public int ConversationId { get; set; }
+    /// <summary>"user" or "assistant".</summary>
+    public string Role { get; set; } = "";
+    public string Content { get; set; } = "";
+    /// <summary>JSON with what the answer was based on: SQL queries, web searches, sources.</summary>
+    public string? Details { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

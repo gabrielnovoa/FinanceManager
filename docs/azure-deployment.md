@@ -428,6 +428,8 @@ is no key anywhere — key auth is disabled on the resource.
 On startup the app creates `ai_reader`, a database user with no login and only
 `db_datareader`; every assistant query runs impersonating it on a separate,
 unpooled connection, so the model cannot change data even with a malformed query.
+`ai_reader` is also denied `SELECT` on `ChatConversations` and `ChatMessages`, so
+one user's saved conversations can never surface in another user's answers.
 
 ```powershell
 $RG  = "rg-finance-tn"

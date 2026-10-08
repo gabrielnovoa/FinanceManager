@@ -20,7 +20,74 @@ public static class SchemaGuard
     {
         await EnsureAliasTableAsync(db, logger, ct);
         await EnsureFixedCostScheduleAsync(db, logger, ct);
+        await EnsureChatHistoryAsync(db, logger, ct);
         await EnsureAssistantReaderAsync(db, logger, ct);
+    }
+
+    /// <summary>Conversations with the AI assistant, kept per user.</summary>
+    private static async Task EnsureChatHistoryAsync(AppDbContext db, ILogger logger, CancellationToken ct)
+    {
+        var sql = db.Database.IsSqlite()
+            ? """
+              CREATE TABLE IF NOT EXISTS "ChatConversations" (
+                  "Id"        INTEGER NOT NULL CONSTRAINT "PK_ChatConversations" PRIMARY KEY AUTOINCREMENT,
+                  "Owner"     TEXT    NOT NULL,
+                  "Title"     TEXT    NOT NULL,
+                  "CreatedAt" TEXT    NOT NULL,
+                  "UpdatedAt" TEXT    NOT NULL
+              );
+              CREATE INDEX IF NOT EXISTS "IX_ChatConversations_Owner_UpdatedAt"
+                  ON "ChatConversations" ("Owner", "UpdatedAt");
+              CREATE TABLE IF NOT EXISTS "ChatMessages" (
+                  "Id"             INTEGER NOT NULL CONSTRAINT "PK_ChatMessages" PRIMARY KEY AUTOINCREMENT,
+                  "ConversationId" INTEGER NOT NULL,
+                  "Role"           TEXT    NOT NULL,
+                  "Content"        TEXT    NOT NULL,
+                  "Details"        TEXT    NULL,
+                  "CreatedAt"      TEXT    NOT NULL,
+                  CONSTRAINT "FK_ChatMessages_ChatConversations_ConversationId" FOREIGN KEY ("ConversationId")
+                      REFERENCES "ChatConversations" ("Id") ON DELETE CASCADE
+              );
+              CREATE INDEX IF NOT EXISTS "IX_ChatMessages_ConversationId" ON "ChatMessages" ("ConversationId");
+              """
+            : """
+              IF OBJECT_ID(N'[ChatConversations]', N'U') IS NULL
+              BEGIN
+                  CREATE TABLE [ChatConversations] (
+                      [Id]        int           NOT NULL IDENTITY,
+                      [Owner]     nvarchar(200) NOT NULL,
+                      [Title]     nvarchar(200) NOT NULL,
+                      [CreatedAt] datetime2     NOT NULL,
+                      [UpdatedAt] datetime2     NOT NULL,
+                      CONSTRAINT [PK_ChatConversations] PRIMARY KEY ([Id])
+                  );
+                  CREATE INDEX [IX_ChatConversations_Owner_UpdatedAt] ON [ChatConversations] ([Owner], [UpdatedAt]);
+              END
+              IF OBJECT_ID(N'[ChatMessages]', N'U') IS NULL
+              BEGIN
+                  CREATE TABLE [ChatMessages] (
+                      [Id]             int           NOT NULL IDENTITY,
+                      [ConversationId] int           NOT NULL,
+                      [Role]           nvarchar(20)  NOT NULL,
+                      [Content]        nvarchar(max) NOT NULL,
+                      [Details]        nvarchar(max) NULL,
+                      [CreatedAt]      datetime2     NOT NULL,
+                      CONSTRAINT [PK_ChatMessages] PRIMARY KEY ([Id]),
+                      CONSTRAINT [FK_ChatMessages_ChatConversations_ConversationId] FOREIGN KEY ([ConversationId])
+                          REFERENCES [ChatConversations] ([Id]) ON DELETE CASCADE
+                  );
+                  CREATE INDEX [IX_ChatMessages_ConversationId] ON [ChatMessages] ([ConversationId]);
+              END
+              """;
+
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(sql, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Could not ensure the chat history tables exist.");
+        }
     }
 
     /// <summary>
@@ -34,12 +101,18 @@ public static class SchemaGuard
         if (db.Database.IsSqlite()) return;
         try
         {
+            // DENY wins over db_datareader: the assistant must never read chat history,
+            // which would let one user's questions surface in another user's answers.
             await db.Database.ExecuteSqlRawAsync($"""
                 IF DATABASE_PRINCIPAL_ID(N'{Ai.FinanceSqlTool.ReaderUser}') IS NULL
                 BEGIN
                     CREATE USER [{Ai.FinanceSqlTool.ReaderUser}] WITHOUT LOGIN;
                     ALTER ROLE [db_datareader] ADD MEMBER [{Ai.FinanceSqlTool.ReaderUser}];
                 END
+                IF OBJECT_ID(N'[ChatConversations]', N'U') IS NOT NULL
+                    DENY SELECT ON [ChatConversations] TO [{Ai.FinanceSqlTool.ReaderUser}];
+                IF OBJECT_ID(N'[ChatMessages]', N'U') IS NOT NULL
+                    DENY SELECT ON [ChatMessages] TO [{Ai.FinanceSqlTool.ReaderUser}];
                 """, ct);
         }
         catch (Exception ex)

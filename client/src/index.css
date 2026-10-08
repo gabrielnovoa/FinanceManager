@@ -569,6 +569,29 @@ td.num .cell-input { text-align: right; }
 /* ---- Assistant chat ---- */
 .chat-page { display: flex; flex-direction: column; min-height: calc(100vh - 56px); }
 .chat-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.chat-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; flex: 1; align-items: start; }
+.chat-main { display: flex; flex-direction: column; min-width: 0; }
+.chat-history { padding: 14px; display: flex; flex-direction: column; gap: 10px; position: sticky; top: 16px; max-height: calc(100vh - 150px); }
+.chat-history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chat-history-head h2 { margin: 0; font-size: 15px; }
+.chat-history-head .btn { padding: 5px 8px; font-size: 12px; }
+.chat-history-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chat-history-tools .btn { padding: 5px 8px; font-size: 12px; }
+.chat-history-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; }
+.chat-history-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 6px; border-radius: 8px; }
+.chat-history-item:hover { background: var(--panel-muted); }
+.chat-history-item.active { background: #eff6ff; box-shadow: inset 3px 0 0 var(--brand); }
+.chat-history-item.checked { background: #fef2f2; }
+.chat-history-item input { margin-top: 3px; width: 14px; height: 14px; padding: 0; accent-color: var(--brand); flex: none; cursor: pointer; }
+.chat-history-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; background: none; border: none; padding: 0; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.chat-history-open:disabled { cursor: progress; }
+.chat-history-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history-meta { font-size: 11px; color: var(--text-soft); }
+.chat-history-foot { margin: 0; }
+@media (max-width: 1000px) {
+  .chat-layout { grid-template-columns: minmax(0, 1fr); }
+  .chat-history { position: static; max-height: 260px; }
+}
 .chat-log { flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 320px; max-height: calc(100vh - 290px); }
 .chat-empty { margin: auto 0; text-align: center; }
 .chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }

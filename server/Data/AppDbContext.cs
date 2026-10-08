@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<Investment> Investments => Set<Investment>();
     public DbSet<BankAccount> Accounts => Set<BankAccount>();
     public DbSet<ClassificationAlias> ClassificationAliases => Set<ClassificationAlias>();
+    public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
+    public DbSet<ChatMessageEntry> ChatMessages => Set<ChatMessageEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +44,20 @@ public class AppDbContext : DbContext
                         v => v.Aggregate(0, (h, x) => HashCode.Combine(h, x)),
                         v => v.ToArray()))
                 .HasMaxLength(40);
+        });
+
+        // Keep in sync with the DDL in SchemaGuard, which creates these on existing databases.
+        modelBuilder.Entity<ChatConversation>(e =>
+        {
+            e.Property(x => x.Owner).HasMaxLength(200);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.HasIndex(x => new { x.Owner, x.UpdatedAt });
+            e.HasMany(x => x.Messages).WithOne().HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ChatMessageEntry>(e =>
+        {
+            e.ToTable("ChatMessages");
+            e.Property(x => x.Role).HasMaxLength(20);
         });
     }
 

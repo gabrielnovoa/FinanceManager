@@ -103,7 +103,11 @@ The model gets the database schema and two tools:
   Searches leave Azure's compliance boundary and are billed per search — set
   `AI__WebSearch=false` to turn it off.
 
-Conversations stay in the browser tab; nothing is stored on the server.
+Conversations are saved in the database **per user** (the Easy Auth sign-in; a
+single "local" user when running without it) and listed beside the chat, where
+they can be reopened, continued, or selected and deleted. The assistant itself
+cannot read them: its SQL screen rejects the chat tables, and on Azure SQL
+`ai_reader` is explicitly denied `SELECT` on them.
 
 To use it locally, sign in with `az login` (your account needs the
 *Cognitive Services OpenAI User* role on the resource) and set:
@@ -237,7 +241,9 @@ FinanceManager/
 |--------|-------|---------|
 | GET/POST/PUT/DELETE | `/api/expenses` (and `income`, `fixedcosts`, `debts`, `networth`, `investments`, `accounts`) | CRUD per table |
 | GET | `/api/dashboard/summary?year=2025` | All KPIs, series and breakdowns |
-| GET | `/api/chat/status` · POST `/api/chat` | Whether the assistant is configured · ask it a question |
+| GET | `/api/chat/status` · POST `/api/chat` | Whether the assistant is configured · ask it a question (new or existing conversation) |
+| GET | `/api/chat/conversations` · `/api/chat/conversations/{id}` | The caller's saved conversations · one with its messages |
+| POST | `/api/chat/conversations/delete` | Delete the caller's conversations by id |
 | POST | `/api/statement/preview` · `/api/statement/commit` | Classify a statement, then save the reviewed lines |
 | GET | `/api/backup/summary` | Row count per table |
 | POST | `/api/import/json` · GET `/api/export/json` | Restore / back up |

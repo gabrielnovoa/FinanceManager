@@ -145,8 +145,13 @@ public sealed partial class FinanceSqlTool(AppDbContext db)
         if (!LeadingSelect().IsMatch(code)) return "only a single SELECT (optionally starting with WITH) is allowed.";
         if (code.TrimEnd(';', ' ', '\n', '\r', '\t').Contains(';')) return "only one statement is allowed.";
         if (Forbidden().Match(code) is { Success: true } m) return $"'{m.Value}' is not allowed — this connection is read-only.";
+        // On SQL Server the reader is also denied these tables; this covers local SQLite.
+        if (PrivateTables().Match(code) is { Success: true } p) return $"{p.Value} is private to each user and not available to queries.";
         return null;
     }
+
+    [GeneratedRegex(@"\b(ChatConversations|ChatMessages)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex PrivateTables();
 
     /// <summary>
     /// Blanks out string literals and drops comments in one left-to-right pass, following
