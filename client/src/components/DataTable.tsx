@@ -13,7 +13,7 @@ import { languages, useI18n } from '../i18n'
 import type { Translate } from '../i18n'
 import type { Field, FieldType } from '../resources'
 import FieldInput from './FieldInput'
-import Icon from './Icon'
+import Icon, { type IconName } from './Icon'
 
 export { inputType, isNumeric }
 
@@ -34,12 +34,20 @@ interface Props {
   onDelete: (id: number) => void
   /** Must reject on failure so the row stays open and the edit is not lost. */
   onUpdate: (id: number, values: Record<string, unknown>) => Promise<void>
+  /** Optional extra button shown before Edit on every row. */
+  rowAction?: RowAction
+}
+
+export interface RowAction {
+  icon: IconName
+  title: string
+  onClick: (row: Row) => void
 }
 
 const NO_DATE = '__nodate__'
 
 export default function DataTable({
-  fields, rows, loading, totalField, groupBy, onRefresh, onDelete, onUpdate,
+  fields, rows, loading, totalField, groupBy, onRefresh, onDelete, onUpdate, rowAction,
 }: Props) {
   const { t, fmt, language } = useI18n()
   const locale = languages[language].locale
@@ -193,6 +201,7 @@ export default function DataTable({
     onCancel: cancelEdit,
     onSave: saveEdit,
     onDelete,
+    rowAction,
     onDraftChange: (key: string, value: string) =>
       setDraft((cur) => ({ ...cur, [key]: value })),
   }
@@ -357,12 +366,13 @@ interface RowProps {
   onCancel: () => void
   onSave: () => void
   onDelete: (id: number) => void
+  rowAction?: RowAction
   onDraftChange: (key: string, value: string) => void
 }
 
 function DataRow({
   row, fields, fmt, t, editingId, draft, invalid, savingRow,
-  onEdit, onCancel, onSave, onDelete, onDraftChange,
+  onEdit, onCancel, onSave, onDelete, rowAction, onDraftChange,
 }: RowProps) {
   const editing = editingId === row.id
   // Editing is one row at a time: while a row is open every other row's
@@ -425,6 +435,17 @@ function DataRow({
           </>
         ) : (
           <>
+            {rowAction && (
+              <button
+                className="icon-btn"
+                onClick={() => rowAction.onClick(row)}
+                disabled={locked}
+                title={locked ? t('table.finishEditFirst') : rowAction.title}
+                aria-label={rowAction.title}
+              >
+                <Icon name={rowAction.icon} />
+              </button>
+            )}
             <button
               className="icon-btn"
               onClick={() => onEdit(row)}

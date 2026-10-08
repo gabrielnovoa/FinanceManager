@@ -18,13 +18,14 @@ const field = (key: string) => resource.fields.find((f) => f.key === key)!
 
 // Each table shows the amount that is actually typed in as editable and the
 // other one as calculated — the white and grey cells of the spreadsheet.
+// No frequency column: the table a row sits in already says how often it is charged.
 const monthlyFields: Field[] = [
-  field('type'), field('category'), field('item'), field('frequency'),
+  field('type'), field('category'), field('item'),
   { ...field('monthlyAmount'), required: true },
   { ...field('annualAmount'), computed: true },
 ]
 const annualFields: Field[] = [
-  field('type'), field('category'), field('item'), field('frequency'), field('dueMonths'),
+  field('type'), field('category'), field('item'), field('dueMonths'),
   { ...field('annualAmount'), required: true },
   { ...field('monthlyAmount'), labelKey: 'field.setAside', computed: true },
 ]
@@ -114,6 +115,15 @@ export default function FixedCosts() {
   const updateFrom = (fields: Field[]) => (id: number, values: Record<string, unknown>) =>
     saveRow(rows.find((r) => r.id === id)!, coerce(values, fields))
 
+  /** Moves a cost to the other table; saveRow carries its amount across. */
+  async function moveRow(row: Row) {
+    try {
+      await saveRow(row, { frequency: isAnnual(row) ? 'Monthly' : 'Annual' })
+    } catch {
+      // Error already shown by the hook.
+    }
+  }
+
   async function toggleMonth(row: Row, month: number) {
     if (toggling) return
     const months = parseMonths(row.dueMonths)
@@ -197,6 +207,7 @@ export default function FixedCosts() {
           onRefresh={load}
           onDelete={remove}
           onUpdate={updateFrom(monthlyFields)}
+          rowAction={{ icon: 'swap', title: t('fixed.moveToAnnual'), onClick: moveRow }}
         />
       </section>
 
@@ -211,6 +222,7 @@ export default function FixedCosts() {
           onRefresh={load}
           onDelete={remove}
           onUpdate={updateFrom(annualFields)}
+          rowAction={{ icon: 'swap', title: t('fixed.moveToMonthly'), onClick: moveRow }}
         />
       </section>
 
