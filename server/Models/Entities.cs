@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace FinanceManager.Api.Models;
@@ -8,25 +9,85 @@ public abstract class BaseEntity
     public int Id { get; set; }
 }
 
-/// <summary>A single spending transaction (sheet: "Despesas").</summary>
-public class Expense : BaseEntity
+/// <summary>A category shared by expenses, income and fixed costs.</summary>
+public class Category : BaseEntity
 {
-    public DateOnly Date { get; set; }
-    public string Item { get; set; } = "";
-    public decimal Amount { get; set; }
-    public string Category { get; set; } = "";
-    public string Source { get; set; } = "";
+    public string Name { get; set; } = "";
 }
 
-/// <summary>A single income transaction (sheet: "Receitas").</summary>
-public class Income : BaseEntity
+/// <summary>An account or card money comes from or goes to (Millenium, Prestige Gold, Wizink…).</summary>
+public class Source : BaseEntity
 {
+    public string Name { get; set; } = "";
+}
+
+/// <summary>
+/// A row whose category is stored as a reference to <see cref="Models.Category"/> but
+/// exchanged by name. The API, the backups and the statement import all read and write
+/// <see cref="Category"/> as plain text; <see cref="Data.AppDbContext"/> turns the name
+/// into a reference on save — matching existing categories case-insensitively and
+/// creating the ones that are new — and the reference is loaded with every query.
+/// </summary>
+public abstract class CategorizedEntity : BaseEntity
+{
+    private string? _category;
+
+    [JsonIgnore] public int? CategoryId { get; set; }
+    [JsonIgnore] public Category? CategoryRef { get; set; }
+
+    [NotMapped]
+    public string Category
+    {
+        get => _category ?? CategoryRef?.Name ?? "";
+        set => _category = value ?? "";
+    }
+
+    /// <summary>A name assigned since the row was loaded, still to be resolved to a reference.</summary>
+    internal string? PendingCategory => _category;
+
+    internal void SetCategory(Category? category)
+    {
+        CategoryRef = category;
+        if (category is null || category.Id > 0) CategoryId = category?.Id;
+        _category = null;
+    }
+}
+
+/// <summary>An expense or income line: a category plus the account or card it went through.</summary>
+public abstract class LedgerEntry : CategorizedEntity
+{
+    private string? _source;
+
     public DateOnly Date { get; set; }
     public string Item { get; set; } = "";
     public decimal Amount { get; set; }
-    public string Category { get; set; } = "";
-    public string Source { get; set; } = "";
+
+    [JsonIgnore] public int? SourceId { get; set; }
+    [JsonIgnore] public Source? SourceRef { get; set; }
+
+    /// <summary>Exchanged by name, stored as a reference — see <see cref="CategorizedEntity"/>.</summary>
+    [NotMapped]
+    public string Source
+    {
+        get => _source ?? SourceRef?.Name ?? "";
+        set => _source = value ?? "";
+    }
+
+    internal string? PendingSource => _source;
+
+    internal void SetSource(Source? source)
+    {
+        SourceRef = source;
+        if (source is null || source.Id > 0) SourceId = source?.Id;
+        _source = null;
+    }
 }
+
+/// <summary>A single spending transaction (sheet: "Despesas").</summary>
+public class Expense : LedgerEntry;
+
+/// <summary>A single income transaction (sheet: "Receitas").</summary>
+public class Income : LedgerEntry;
 
 /// <summary>How often a fixed cost is actually charged.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -39,10 +100,9 @@ public enum CostFrequency
 }
 
 /// <summary>A recurring fixed or variable cost (sheet: "Gastos Fixos").</summary>
-public class FixedCost : BaseEntity
+public class FixedCost : CategorizedEntity
 {
     public string Type { get; set; } = "";      // "Conta Fixa" | "Conta Variável"
-    public string Category { get; set; } = "";
     public string Item { get; set; } = "";
     public CostFrequency Frequency { get; set; } = CostFrequency.Monthly;
     /// <summary>

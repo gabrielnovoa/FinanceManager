@@ -20,7 +20,11 @@ export interface Field {
   computed?: boolean
   /** Choices for a 'select' field. */
   options?: FieldOption[]
+  /** Offer autocomplete from the category list, the source list, or the items already used. */
+  suggest?: SuggestKind
 }
+
+export type SuggestKind = 'category' | 'source' | 'item'
 
 export interface Resource {
   key: string        // URL segment, e.g. "expenses"
@@ -76,10 +80,10 @@ export const resources: Record<string, Resource> = {
     groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
-      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true, suggest: 'item' },
       { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
-      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
-      { key: 'source', labelKey: 'field.source', type: 'text' },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true, suggest: 'category' },
+      { key: 'source', labelKey: 'field.source', type: 'text', suggest: 'source' },
     ],
     defaults: () => ({ date: today(), item: '', amount: 0, category: '', source: '' }),
   },
@@ -93,10 +97,10 @@ export const resources: Record<string, Resource> = {
     groupBy: 'date',
     fields: [
       { key: 'date', labelKey: 'field.date', type: 'date', required: true },
-      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true, suggest: 'item' },
       { key: 'amount', labelKey: 'field.amount', type: 'money', required: true },
-      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
-      { key: 'source', labelKey: 'field.source', type: 'text' },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true, suggest: 'category' },
+      { key: 'source', labelKey: 'field.source', type: 'text', suggest: 'source' },
     ],
     defaults: () => ({ date: today(), item: '', amount: 0, category: '', source: '' }),
   },
@@ -111,8 +115,8 @@ export const resources: Record<string, Resource> = {
     // and an annual table, each showing only the columns that matter there.
     fields: [
       { key: 'type', labelKey: 'field.type', type: 'text' },
-      { key: 'category', labelKey: 'field.category', type: 'text', required: true },
-      { key: 'item', labelKey: 'field.item', type: 'text', required: true },
+      { key: 'category', labelKey: 'field.category', type: 'text', required: true, suggest: 'category' },
+      { key: 'item', labelKey: 'field.item', type: 'text', required: true, suggest: 'item' },
       { key: 'frequency', labelKey: 'field.frequency', type: 'select', options: frequencyOptions },
       { key: 'dueMonths', labelKey: 'field.dueMonths', type: 'months' },
       { key: 'monthlyAmount', labelKey: 'field.monthlyAmount', type: 'money' },

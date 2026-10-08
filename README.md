@@ -17,6 +17,7 @@ delete records, explore interactive reports and charts, and deploy it to Azure.
 | **Assistant** | Chat with an AI model about your own data — analyses, period comparisons, what-if simulations. It runs read-only SQL on the database and can search the web for outside facts (rates, inflation, tax rules) |
 | **Data pages** | Full add/edit/delete for Expenses, Income, Fixed Costs, Debts, Net Worth, Investments, Bank Accounts — each with running totals |
 | **Fixed Costs** | Separate monthly and annual tables, plus a calendar of the months each annual cost falls due and how much to set aside per month |
+| **Categories & sources** | Every category and source stored once and referenced by the rows that use it: rename in one place, merge duplicates, see possible typos |
 | **Import / Export** | Import a bank/card statement with automatic classification, back up and restore everything as JSON, or reset |
 
 Every table mirrors a sheet from the original workbook:
@@ -87,6 +88,25 @@ cell to mark or clear a month.
 When an existing database is upgraded, rows whose annual amount is not exactly
 twelve monthly ones (e.g. IMI 770,00 vs 64,17 × 12) are classified as annual
 automatically. Check the rest and set the due months.
+
+### Categories and sources
+
+Categories (shared by expenses, income and fixed costs) and sources (the account or
+card) live in their own tables, `Categories` and `Sources`; each row stores a
+reference. The API, the statement import and the JSON backups still exchange plain
+names: on save, a name is matched to an existing entry ignoring case and extra
+spaces (`"casa "` → `Casa`), and an entry is created only when the name is new.
+Inputs offer autocomplete for category, source and item.
+
+The **Categories & sources** page renames an entry everywhere it is used, merges one
+entry into another, and deletes entries nothing uses. It also lists names that look
+like **typos** of each other (`Subscriptions` / `Subscription`) — suggestions only:
+nothing is merged unless you click and confirm, and names that are merely similar in
+meaning are never suggested.
+
+Databases created before this change are migrated on startup: each distinct text
+value becomes an entry and the text columns are dropped. Values differing only in
+case or spacing become one entry, named after the spelling most rows use.
 
 ### AI assistant (optional)
 
@@ -241,6 +261,9 @@ FinanceManager/
 |--------|-------|---------|
 | GET/POST/PUT/DELETE | `/api/expenses` (and `income`, `fixedcosts`, `debts`, `networth`, `investments`, `accounts`) | CRUD per table |
 | GET | `/api/dashboard/summary?year=2025` | All KPIs, series and breakdowns |
+| GET | `/api/lookups` | Categories and sources with usage counts, and possible typos |
+| PUT · DELETE | `/api/lookups/{categories\|sources}/{id}` | Rename · delete an unused entry |
+| POST | `/api/lookups/{categories\|sources}/{id}/merge` | Move every row to `targetId` and delete this entry |
 | GET | `/api/chat/status` · POST `/api/chat` | Whether the assistant is configured · ask it a question (new or existing conversation) |
 | GET | `/api/chat/conversations` · `/api/chat/conversations/{id}` | The caller's saved conversations · one with its messages |
 | POST | `/api/chat/conversations/delete` | Delete the caller's conversations by id |

@@ -57,9 +57,10 @@ export function useResourceData(resource: Resource) {
     setError(null)
     try {
       await api.put(`${resource.endpoint}/${id}`, { ...body, id })
-      // Calculated columns are derived server-side, so an optimistic merge would
-      // leave them stale — refetch instead when the resource has any.
-      if (resource.fields.some((f) => f.computed)) await load()
+      // Calculated columns are derived server-side, and category/source names are
+      // matched to the canonical entry ("casa" → "Casa"), so an optimistic merge would
+      // show stale values — refetch instead when the resource has either.
+      if (resource.fields.some((f) => f.computed || f.suggest === 'category' || f.suggest === 'source')) await load()
       else setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...body, id } : r)))
     } catch (err) {
       setError((err as Error).message)

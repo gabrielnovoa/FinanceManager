@@ -76,6 +76,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
 
+        <NavLink to="/lookups" className={linkClass} onClick={closeNav}>
+          <span className="ico">🏷️</span> {t('nav.lookups')}
+        </NavLink>
+
         <NavLink to="/import" className={linkClass} onClick={closeNav}>
           <span className="ico">⇄</span> {t('nav.importExport')}
         </NavLink>

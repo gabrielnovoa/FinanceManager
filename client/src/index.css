@@ -658,3 +658,16 @@ td.num .cell-input { text-align: right; }
   .chat-page { min-height: calc(100vh - 96px); }
   .chat-log { max-height: none; }
 }
+
+/* ---- Categories & sources ---- */
+.lookups-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; align-items: start; }
+.lookup-card .table-wrap { max-height: 65vh; overflow-y: auto; }
+.lookup-table th, .lookup-table td { padding: 7px 10px; }
+.lookup-name { font-weight: 600; }
+.lookup-merge { padding: 4px 6px; font-size: 13px; max-width: 160px; }
+@media (max-width: 520px) { .lookups-grid { grid-template-columns: minmax(0, 1fr); } }
+.typo-card { margin-bottom: 18px; border-color: #fde68a; background: #fffbeb; }
+.typo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.typo-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.typo-pair { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+.typo-actions { display: flex; gap: 6px; }

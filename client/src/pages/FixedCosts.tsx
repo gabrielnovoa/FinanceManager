@@ -6,6 +6,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import DataTable, { type Row } from '../components/DataTable'
 import FieldInput from '../components/FieldInput'
 import MonthPicker from '../components/MonthPicker'
+import { SuggestionsProvider } from '../components/suggestions'
 import { useResourceData } from '../components/useResourceData'
 import { coerce, parseMonths } from '../fieldValues'
 import { useI18n } from '../i18n'
@@ -139,6 +140,7 @@ export default function FixedCosts() {
   }
 
   return (
+    <SuggestionsProvider rows={rows} version={rows}>
     <div>
       <h1 className="page-title">{resource.icon} {t(resource.titleKey)}</h1>
       <p className="page-sub">{t(resource.subtitleKey)}</p>
@@ -232,6 +234,7 @@ export default function FixedCosts() {
         <AnnualCalendar rows={annual} setAside={setAside} busy={toggling} onToggle={toggleMonth} />
       </section>
     </div>
+    </SuggestionsProvider>
   )
 }
 

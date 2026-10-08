@@ -493,7 +493,8 @@ never races the first.
 `EnsureCreated()` builds the schema on the first request after deployment.
 The app has no EF migrations: tables and columns added later are created on
 startup by `SchemaGuard` (for example `FixedCosts.Frequency` and
-`FixedCosts.DueMonths`). Any other model change, such as renaming or retyping a
+`FixedCosts.DueMonths`, and the move of categories and sources from text columns
+into the `Categories` and `Sources` tables). Any other model change, such as renaming or retyping a
 column, still means dropping and recreating `financedb` — export your data first.
 
 Azure SQL occasionally drops connections, for example during a failover or

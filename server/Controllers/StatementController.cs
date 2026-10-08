@@ -274,9 +274,9 @@ public class StatementController(
     private async Task<List<HistoryEntry>> BuildHistoryAsync(CancellationToken ct)
     {
         var expenses = await db.Expenses.AsNoTracking()
-            .Select(e => new { e.Item, e.Category }).ToListAsync(ct);
+            .Select(e => new { e.Item, Category = e.CategoryRef != null ? e.CategoryRef.Name : "" }).ToListAsync(ct);
         var incomes = await db.Incomes.AsNoTracking()
-            .Select(i => new { i.Item, i.Category }).ToListAsync(ct);
+            .Select(i => new { i.Item, Category = i.CategoryRef != null ? i.CategoryRef.Name : "" }).ToListAsync(ct);
 
         static IEnumerable<HistoryEntry> Summarise<T>(IEnumerable<T> rows, LineKind kind,
             Func<T, string> item, Func<T, string> category) =>
@@ -293,17 +293,8 @@ public class StatementController(
             .ToList();
     }
 
-    private async Task<List<string>> KnownSourcesAsync(CancellationToken ct)
-    {
-        var fromExpenses = await db.Expenses.AsNoTracking().Select(e => e.Source).Distinct().ToListAsync(ct);
-        var fromIncomes = await db.Incomes.AsNoTracking().Select(i => i.Source).Distinct().ToListAsync(ct);
-
-        return fromExpenses.Concat(fromIncomes)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(s => s)
-            .ToList();
-    }
+    private async Task<List<string>> KnownSourcesAsync(CancellationToken ct) =>
+        await db.Sources.AsNoTracking().Select(s => s.Name).OrderBy(s => s).ToListAsync(ct);
 
     /// <summary>
     /// Loads the movements already stored in the statement's date range so duplicates can
@@ -317,12 +308,12 @@ public class StatementController(
 
         var expenses = await db.Expenses.AsNoTracking()
             .Where(e => e.Date >= from && e.Date <= to)
-            .Select(e => new { e.Date, e.Amount, e.Source })
+            .Select(e => new { e.Date, e.Amount, Source = e.SourceRef != null ? e.SourceRef.Name : "" })
             .ToListAsync(ct);
 
         var incomes = await db.Incomes.AsNoTracking()
             .Where(i => i.Date >= from && i.Date <= to)
-            .Select(i => new { i.Date, i.Amount, i.Source })
+            .Select(i => new { i.Date, i.Amount, Source = i.SourceRef != null ? i.SourceRef.Name : "" })
             .ToListAsync(ct);
 
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

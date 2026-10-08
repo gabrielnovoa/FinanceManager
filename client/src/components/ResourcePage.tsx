@@ -6,6 +6,7 @@ import type { Resource } from '../resources'
 import DataTable from './DataTable'
 import FieldInput from './FieldInput'
 import ReplicateMonthDialog from './ReplicateMonthDialog'
+import { SuggestionsProvider } from './suggestions'
 import { useResourceData } from './useResourceData'
 
 export default function ResourcePage({ resource }: { resource: Resource }) {
@@ -48,7 +49,10 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
     await load()
   }
 
+  // Rows are reloaded after every add, so passing them as the version also refreshes
+  // the category and source lists when a save has just created a new one.
   return (
+    <SuggestionsProvider rows={rows} version={rows}>
     <div>
       <h1 className="page-title">{resource.icon} {t(resource.titleKey)}</h1>
       <p className="page-sub">{t(resource.subtitleKey)}</p>
@@ -113,5 +117,6 @@ export default function ResourcePage({ resource }: { resource: Resource }) {
         onUpdate={update}
       />
     </div>
+    </SuggestionsProvider>
   )
 }

@@ -81,6 +81,9 @@ public class ImportController(AppDbContext db, IWebHostEnvironment env, DebtCalc
         db.NetWorthEntries.RemoveRange(db.NetWorthEntries);
         db.Investments.RemoveRange(db.Investments);
         db.Accounts.RemoveRange(db.Accounts);
+        // The rows referencing them are gone in the same save, so the lookups can go too.
+        db.Categories.RemoveRange(db.Categories);
+        db.Sources.RemoveRange(db.Sources);
         await db.SaveChangesAsync();
         return new ImportResultDto("All data cleared.", new());
     }

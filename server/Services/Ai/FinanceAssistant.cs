@@ -181,12 +181,18 @@ public sealed class FinanceAssistant
     private const string Schema = """
         Tables (every table also has an integer Id):
 
-        Expenses(Date, Item, Amount, Category, Source)
-          Every outgoing transaction. Amount is positive. Source is the account or card it was paid with.
-        Incomes(Date, Item, Amount, Category, Source)
-          Money in: salary, refunds, cashback… Amount is positive.
-        FixedCosts(Type, Category, Item, Frequency, DueMonths, MonthlyAmount, AnnualAmount)
+        Categories(Id, Name)
+          The categories, shared by Expenses, Incomes and FixedCosts.
+        Sources(Id, Name)
+          The accounts and cards money is paid from or received into.
+        Expenses(Date, Item, Amount, CategoryId, SourceId)
+          Every outgoing transaction. Amount is positive. CategoryId → Categories.Id, SourceId → Sources.Id
+          (the account or card it was paid with). Both may be NULL.
+        Incomes(Date, Item, Amount, CategoryId, SourceId)
+          Money in: salary, refunds, cashback… Amount is positive. Same references as Expenses.
+        FixedCosts(Type, CategoryId, Item, Frequency, DueMonths, MonthlyAmount, AnnualAmount)
           Recurring commitments (the budget, not actual payments). Type is 'Conta Fixa' (fixed) or 'Conta Variável' (variable estimate).
+          CategoryId → Categories.Id.
           Frequency is 'Monthly' or 'Annual'. For annual costs DueMonths lists the months they are charged as text like '5,8,11'
           (the annual amount is split evenly across them) and MonthlyAmount is AnnualAmount / 12, i.e. what to set aside per month.
         Debts(Date, Item, Installment, Outstanding, TermMonths, Interest)
@@ -203,8 +209,9 @@ public sealed class FinanceAssistant
         ClassificationAliases(Pattern, Kind, Item, Category, Hits)
           Internal rules used to classify bank statement lines. Rarely relevant.
 
-        Item and Category values are free text in Portuguese. Match them case- and accent-tolerantly with LIKE
-        and check the distinct values below before filtering.
+        Item is free text in Portuguese; category and source names are listed below. To filter or group by
+        category or source, JOIN Categories / Sources (LEFT JOIN when rows without one should count) and
+        match the Name case- and accent-tolerantly with LIKE, using the names listed below.
         """;
 
     /// <summary>Row counts, date ranges and the category vocabulary, so the model filters on real values.</summary>
@@ -234,10 +241,8 @@ public sealed class FinanceAssistant
             if (list.Count > 0) sb.AppendLine($"- {label}: {string.Join(" | ", list)}");
         }
 
-        await Distinct("Expense categories", db.Expenses.Select(e => e.Category));
-        await Distinct("Expense sources", db.Expenses.Select(e => e.Source));
-        await Distinct("Income categories", db.Incomes.Select(e => e.Category));
-        await Distinct("Fixed cost categories", db.FixedCosts.Select(e => e.Category));
+        await Distinct("Categories", db.Categories.Select(c => c.Name));
+        await Distinct("Sources", db.Sources.Select(s => s.Name));
         await Distinct("Debt items", db.Debts.Select(e => e.Item));
         await Distinct("Net worth asset classes", db.NetWorthEntries.Select(e => e.AssetClass));
         return sb.ToString();

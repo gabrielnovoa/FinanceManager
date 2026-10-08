@@ -19,7 +19,7 @@ public class IncomeController(AppDbContext db) : CrudControllerBase<Income>(db)
 
 public class FixedCostsController(AppDbContext db) : CrudControllerBase<FixedCost>(db)
 {
-    protected override IQueryable<FixedCost> Query() => Set.OrderBy(e => e.Category).ThenBy(e => e.Item);
+    protected override IQueryable<FixedCost> Query() => Set.OrderBy(e => e.CategoryRef!.Name).ThenBy(e => e.Item);
 
     // Only the amount matching the frequency is user input; the other is derived.
     protected override void OnSaving(FixedCost entity) => FixedCostCalculator.Apply(entity);

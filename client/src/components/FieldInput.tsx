@@ -1,8 +1,9 @@
-import type { KeyboardEvent } from 'react'
+import { useId, type KeyboardEvent } from 'react'
 import { useI18n } from '../i18n'
 import type { Field } from '../resources'
 import { inputType, isNumeric } from '../fieldValues'
 import MonthPicker from './MonthPicker'
+import { useSuggestions } from './suggestions'
 
 interface Props {
   field: Field
@@ -22,6 +23,8 @@ export default function FieldInput({
 }: Props) {
   const { t } = useI18n()
   const label = t(field.labelKey)
+  const suggestions = useSuggestions(field.suggest)
+  const listId = useId()
 
   if (field.type === 'months') {
     return <MonthPicker value={value} onChange={onChange} disabled={disabled} label={label} />
@@ -48,18 +51,27 @@ export default function FieldInput({
   }
 
   return (
-    <input
-      className={className}
-      type={inputType(field.type)}
-      step={isNumeric(field.type) ? 'any' : undefined}
-      value={value}
-      autoFocus={autoFocus}
-      disabled={disabled}
-      required={required}
-      aria-label={label}
-      aria-invalid={invalid || undefined}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-    />
+    <>
+      <input
+        className={className}
+        type={inputType(field.type)}
+        step={isNumeric(field.type) ? 'any' : undefined}
+        value={value}
+        autoFocus={autoFocus}
+        disabled={disabled}
+        required={required}
+        aria-label={label}
+        aria-invalid={invalid || undefined}
+        list={suggestions.length > 0 ? listId : undefined}
+        autoComplete={suggestions.length > 0 ? 'off' : undefined}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      {suggestions.length > 0 && (
+        <datalist id={listId}>
+          {suggestions.map((s) => <option key={s} value={s} />)}
+        </datalist>
+      )}
+    </>
   )
 }

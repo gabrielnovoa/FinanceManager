@@ -30,18 +30,16 @@ are already in the build.
 
 ## Data model improvements
 
-- **Link transactions to accounts.** Today `Source`/`Fonte` is free text
-  ("Millenium", "Crédito Prestige", "Wise Gabriel"…). Making it a reference to the
-  Bank Accounts table unlocks per-account balances and reconciliation.
+- **Link transactions to accounts.** Sources now live in their own table
+  (`Sources`); linking each one to an entry in Bank Accounts would unlock
+  per-account balances and reconciliation.
 - **Add an `owner` dimension (titular A / titular B).** Your holdings already split by
   person (Fidelity A/B, GNB A/B). A per-person tag enables
   household-vs-individual reporting.
 - **Add a `currency` column.** You use several platforms (Wise, Trade Republic,
   Revolut) that can hold non-EUR balances; storing currency avoids silent mixing.
-- **Consolidate categories.** There's some overlap/noise ("Comida" vs
-  "Restaurante" vs "Mercado"; a stray "Ne" category). A controlled category list
-  (enforced by a dropdown on import/entry) makes the charts cleaner and trends
-  more reliable.
+- ✅ **Controlled category and source lists.** Stored once and referenced, with
+  autocomplete, rename/merge, and typo suggestions on the Categories & sources page.
 - **Flag recurring vs one-off** on transactions to separate predictable spend from
   discretionary spend in reports.
 

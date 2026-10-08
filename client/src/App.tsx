@@ -5,6 +5,7 @@ import Chat from './pages/Chat'
 import Dashboard from './pages/Dashboard'
 import FixedCosts from './pages/FixedCosts'
 import ImportExport from './pages/ImportExport'
+import LookupsPage from './pages/Lookups'
 import { resourceList } from './resources'
 
 /** Tables that need more than the generic add-and-list page. */
@@ -28,6 +29,7 @@ export default function App() {
             />
           )
         })}
+        <Route path="/lookups" element={<LookupsPage />} />
         <Route path="/import" element={<ImportExport />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
